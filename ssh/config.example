@@ -1,0 +1,5 @@
+Host debian-dev
+    HostName 192.168.56.25
+    User user
+    IdentityFile ~/.ssh/keys/local_id.rsa
+

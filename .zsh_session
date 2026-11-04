@@ -1,0 +1,281 @@
+# iTerm2 tab colors available to local and remote session helpers.
+iterm_red() {
+  printf "\033]6;1;bg;red;brightness;100\a"
+  printf "\033]6;1;bg;green;brightness;0\a"
+  printf "\033]6;1;bg;blue;brightness;0\a"
+}
+
+iterm_green() {
+  printf "\033]6;1;bg;red;brightness;0\a"
+  printf "\033]6;1;bg;green;brightness;100\a"
+  printf "\033]6;1;bg;blue;brightness;0\a"
+}
+
+iterm_blue() {
+  printf "\033]6;1;bg;red;brightness;0\a"
+  printf "\033]6;1;bg;green;brightness;0\a"
+  printf "\033]6;1;bg;blue;brightness;100\a"
+}
+
+iterm_yellow() {
+  printf "\033]6;1;bg;red;brightness;100\a"
+  printf "\033]6;1;bg;green;brightness;100\a"
+  printf "\033]6;1;bg;blue;brightness;0\a"
+}
+
+iterm_orange() {
+  printf "\033]6;1;bg;red;brightness;100\a"
+  printf "\033]6;1;bg;green;brightness;65\a"
+  printf "\033]6;1;bg;blue;brightness;0\a"
+}
+
+iterm_purple() {
+  printf "\033]6;1;bg;red;brightness;75\a"
+  printf "\033]6;1;bg;green;brightness;0\a"
+  printf "\033]6;1;bg;blue;brightness;144\a"
+}
+
+iterm_pink() {
+  printf "\033]6;1;bg;red;brightness;100\a"
+  printf "\033]6;1;bg;green;brightness;75\a"
+  printf "\033]6;1;bg;blue;brightness;80\a"
+}
+
+iterm_cyan() {
+  printf "\033]6;1;bg;red;brightness;0\a"
+  printf "\033]6;1;bg;green;brightness;100\a"
+  printf "\033]6;1;bg;blue;brightness;100\a"
+}
+
+iterm_magenta() {
+  printf "\033]6;1;bg;red;brightness;100\a"
+  printf "\033]6;1;bg;green;brightness;0\a"
+  printf "\033]6;1;bg;blue;brightness;100\a"
+}
+
+iterm_gray() {
+  printf "\033]6;1;bg;red;brightness;50\a"
+  printf "\033]6;1;bg;green;brightness;50\a"
+  printf "\033]6;1;bg;blue;brightness;50\a"
+}
+
+iterm_muted_red() {
+  printf "\033]6;1;bg;red;brightness;75\a"
+  printf "\033]6;1;bg;green;brightness;35\a"
+  printf "\033]6;1;bg;blue;brightness;35\a"
+}
+
+iterm_muted_purple() {
+  printf "\033]6;1;bg;red;brightness;55\a"
+  printf "\033]6;1;bg;green;brightness;35\a"
+  printf "\033]6;1;bg;blue;brightness;75\a"
+}
+
+iterm_muted_blue() {
+  printf "\033]6;1;bg;red;brightness;35\a"
+  printf "\033]6;1;bg;green;brightness;50\a"
+  printf "\033]6;1;bg;blue;brightness;75\a"
+}
+
+iterm_muted_green() {
+  printf "\033]6;1;bg;red;brightness;35\a"
+  printf "\033]6;1;bg;green;brightness;75\a"
+  printf "\033]6;1;bg;blue;brightness;45\a"
+}
+
+iterm_muted_yellow() {
+  printf "\033]6;1;bg;red;brightness;75\a"
+  printf "\033]6;1;bg;green;brightness;65\a"
+  printf "\033]6;1;bg;blue;brightness;25\a"
+}
+
+iterm_muted_orange() {
+  printf "\033]6;1;bg;red;brightness;75\a"
+  printf "\033]6;1;bg;green;brightness;50\a"
+  printf "\033]6;1;bg;blue;brightness;25\a"
+}
+
+iterm_muted_pink() {
+  printf "\033]6;1;bg;red;brightness;75\a"
+  printf "\033]6;1;bg;green;brightness;45\a"
+  printf "\033]6;1;bg;blue;brightness;60\a"
+}
+
+iterm_muted_cyan() {
+  printf "\033]6;1;bg;red;brightness;30\a"
+  printf "\033]6;1;bg;green;brightness;70\a"
+  printf "\033]6;1;bg;blue;brightness;70\a"
+}
+
+iterm_muted_magenta() {
+  printf "\033]6;1;bg;red;brightness;70\a"
+  printf "\033]6;1;bg;green;brightness;35\a"
+  printf "\033]6;1;bg;blue;brightness;70\a"
+}
+
+iterm_muted_gray() {
+  printf "\033]6;1;bg;red;brightness;45\a"
+  printf "\033]6;1;bg;green;brightness;45\a"
+  printf "\033]6;1;bg;blue;brightness;45\a"
+}
+
+iterm_reset() {
+  printf "\033]6;1;bg;*;default\a"
+}
+
+tmux_status_bg_color() {
+  case "$1" in
+    muted_red) echo "#5f3030" ;;
+    muted_purple) echo "#4c3b63" ;;
+    muted_blue) echo "#354f75" ;;
+    muted_green) echo "#3b6f4a" ;;
+    muted_yellow) echo "#786828" ;;
+    muted_orange) echo "#784f28" ;;
+    muted_pink) echo "#784860" ;;
+    muted_cyan) echo "#307070" ;;
+    muted_magenta) echo "#703870" ;;
+    muted_gray) echo "#555555" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# First window uses the current terminal; the rest open new iTerm tabs.
+typeset -a WORKSPACE_TABS=(nvim lazygit opencode tab4 tab5 tab6 tab7 tab8 tab9)
+
+# Prepare and attach to one local tmux session, reusing it if present.
+tmux_local() {
+  local target_dir=${1:-$PWD}
+  local project_name=${2:-${target_dir:t}}
+  local window_name=$3
+  local status_style=$4
+  local local_group=${5:-}
+  local session_name="session_${project_name}"
+
+  if [[ -n "$window_name" ]]; then
+    session_name="${session_name}_${window_name}"
+  fi
+
+  if [[ ! -d "$target_dir" ]]; then
+    echo "usage: tmux_local [project-dir] [project-name] [window-name]"
+    return 1
+  fi
+
+  target_dir=${target_dir:A}
+  cd -- "$target_dir" || return
+
+  local session_id
+  session_id=$(tmux_session_prepare "$target_dir" "$session_name" "$status_style" "${window_name:-main}") || return
+  if [[ -n "$local_group" ]]; then
+    tmux set-option -t "$session_id" @workspace_local_group "$local_group" || return
+    tmux set-option -t "$session_id" @workspace_local_name "$session_name" || return
+  fi
+
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$session_id"
+  else
+    tmux attach-session -t "$session_id"
+  fi
+}
+
+# Write commands into new iTerm2 tabs; each tab attaches to its tmux session.
+tmux_iterm_new_tabs() {
+  local iterm_color=$1 command_text
+  shift
+  {
+    print -r -- 'tell application "iTerm2"'
+    print -r -- '  tell current window'
+    for command_text in "$@"; do
+      command_text="iterm_reset; iterm_${iterm_color}; $command_text"
+      command_text=${command_text//\\/\\\\}
+      command_text=${command_text//\"/\\\"}
+      command_text=${command_text//$'\n'/\\n}
+      command_text=${command_text//$'\r'/\\r}
+      print -r -- '    set newTab to (create tab with default profile)'
+      print -r -- '    tell current session of newTab'
+      print -r -- "      write text \"$command_text\""
+      print -r -- '    end tell'
+    done
+    print -r -- '  end tell'
+    print -r -- 'end tell'
+  } | osascript
+}
+
+tmux_local_tabs() {
+  local target_dir=$1
+  local project_name=${2:-${target_dir:t}}
+  local iterm_color=${3:-muted_red}
+  local tmux_bg_color=${4:-#5f3030}
+  local tmux_fg_color=${5:-white}
+  local local_group=${6:-}
+  local tabcount=${7:-${#WORKSPACE_TABS}}
+
+  if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
+    echo "usage: tmux_local_tabs <project-dir> [project-name] [iterm-color] [tmux-bg] [tmux-fg]"
+    return 1
+  fi
+  if [[ $tabcount != <-> ]] || (( tabcount < 1 || tabcount > ${#WORKSPACE_TABS} )); then
+    print -u2 -- "tabcount must be between 1 and ${#WORKSPACE_TABS}"
+    return 1
+  fi
+
+  local status_style="bg=$tmux_bg_color,fg=$tmux_fg_color"
+  iterm_reset
+  "iterm_${iterm_color}"
+
+  local window_name
+  local -a commands=() selected_tabs=("${WORKSPACE_TABS[@]:0:$tabcount}")
+  for window_name in "${selected_tabs[@]:1}"; do
+    commands+=("tmux_local ${(q)target_dir} ${(q)project_name} ${(q)window_name} ${(q)status_style} ${(q)local_group}")
+  done
+  tmux_iterm_new_tabs "$iterm_color" "${commands[@]}" || return
+  # Attach in the invoking shell, not in a newly opened tab.
+  tmux_local "$target_dir" "$project_name" "$WORKSPACE_TABS[1]" "$status_style" "$local_group"
+}
+
+tmux_remote_tabs() {
+  local tab_count=$1 remote_host=$2 project_path=$3 project_name=$4
+  local iterm_color=$5 tmux_fg_color=${6:-white}
+  local remote_group=${8:-}
+  if [[ $tab_count != <-> ]] || (( tab_count < 1 || tab_count > ${#WORKSPACE_TABS} )); then
+    print -u2 -- "tabcount must be between 1 and ${#WORKSPACE_TABS}"
+    return 1
+  fi
+  if [[ -z "$remote_host" || -z "$project_path" ]]; then
+    echo "usage: tmux_remote_project <remote-host> <project-path> <name> <color> [foreground]"
+    return 1
+  fi
+
+  local path_for_remote=${project_path/#$HOME/\$HOME}
+  local session_name=${7:-${path_for_remote##*/}}
+  case "$session_name" in
+    ''|'$HOME'|'~') session_name=main ;;
+  esac
+  local tmux_bg_color=$(tmux_status_bg_color "$iterm_color")
+  local status_style="bg=$tmux_bg_color,fg=$tmux_fg_color"
+  local window_name remote_session
+  local -a sessions=() commands=()
+  for window_name in "${WORKSPACE_TABS[@]:0:$tab_count}"; do
+    remote_session="${session_name}_${window_name}"
+    sessions+=("$remote_session")
+    if [[ "$window_name" != "$WORKSPACE_TABS[1]" ]]; then
+      commands+=("tmux_connect ${(q)remote_host} ${(q)remote_session}")
+    fi
+  done
+
+  # Install once and queue all sessions over a separate, non-interactive SSH call.
+  tmux_prepare_remote "$remote_host" "$path_for_remote" "$status_style" "$remote_group" "${sessions[@]}" || return
+  iterm_reset
+  "iterm_${iterm_color}"
+  echo "=== ${project_name} ==="
+  if (( ${#commands} )); then
+    tmux_iterm_new_tabs "$iterm_color" "${commands[@]}" || return
+  fi
+  tmux_connect "$remote_host" "${sessions[1]}"
+}
+
+WORKSPACE_ROOT=${${(%):-%x}:A:h}
+. "$WORKSPACE_ROOT/.tmux_session.local.sh"
+. "$WORKSPACE_ROOT/sessions.local.sh"
+. "$WORKSPACE_ROOT/.tmux_session.remote.sh"
+. "$WORKSPACE_ROOT/sessions.remote.sh"
+. "$WORKSPACE_ROOT/.tmux_session.shared.sh"

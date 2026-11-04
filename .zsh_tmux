@@ -1,0 +1,56 @@
+WORKSPACE_ROOT=${${(%):-%x}:A:h}
+
+# Send the repo hook over SSH, install it remotely, and prepare each session.
+tmux_prepare_remote() {
+  local host=$1 target_dir=$2 status_style=$3 remote_group=$4
+  shift 4
+  local remote_command="sh -s -- ${(qq)target_dir} ${(qq)status_style} ${(qq)remote_group}"
+  local session_name
+  for session_name in "$@"; do
+    remote_command+=" ${(qq)session_name}"
+  done
+  [[ -r "$WORKSPACE_ROOT/.tmux_session.shared.sh" ]] || return 1
+
+  # Stream a shell script over SSH; its heredoc contains the local hook file.
+  {
+    print -r -- 'set -eu'
+    print -r -- 'umask 077'
+    print -r -- 'hook_tmp=$(mktemp "$HOME/.tmux_session.shared.sh.XXXXXX")'
+    print -r -- 'trap '\''rm -f -- "$hook_tmp"'\'' 0'
+    print -r -- 'cat > "$hook_tmp" <<'\''TMUX_SESSION_HOOK_EOF'\'''
+    cat -- "$WORKSPACE_ROOT/.tmux_session.shared.sh"
+    print -r -- 'TMUX_SESSION_HOOK_EOF'
+    print -r -- 'mv -- "$hook_tmp" "$HOME/.tmux_session.shared.sh"'
+    print -r -- '. "$HOME/.tmux_session.shared.sh"'
+    print -r -- 'tmux_session_install'
+    print -r -- 'target_dir=$1; status_style=$2; remote_group=$3; shift 3'
+    print -r -- 'for session_name do'
+    print -r -- '  session_id=$(tmux_session_prepare "$target_dir" "$session_name" "$status_style") || exit'
+    print -r -- '  if [ -n "$remote_group" ]; then'
+    print -r -- '    tmux set-option -t "$session_id" @workspace_remote_group "$remote_group" || exit'
+    print -r -- '    tmux set-option -t "$session_id" @workspace_remote_name "$session_name" || exit'
+    print -r -- '  fi'
+    print -r -- 'done'
+  } | ssh "$host" "$remote_command"
+}
+
+# Attach to an existing remote session, or create one if it is missing.
+tmux_connect() {
+  if [[ -z "$1" || -z "$2" ]]; then
+    echo "Usage: connect <host> <session[:tab]>"
+    return 1
+  fi
+  local host=$1 session=$2
+  local remote_command='if [ -r "$HOME/.tmux_session.shared.sh" ]; then
+  . "$HOME/.tmux_session.shared.sh"
+  session_id=$(tmux_session_id '
+  remote_command+="${(qq)session}"
+  remote_command+=')
+  if [ -n "$session_id" ]; then
+    exec tmux attach-session -t "$session_id"
+  fi
+fi
+exec tmux new-session -A -s '
+  remote_command+="${(qq)session}"
+  ssh -t "$host" "$remote_command"
+}
