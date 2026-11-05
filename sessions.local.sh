@@ -1,5 +1,6 @@
-local-yellow() { 
-  local tabcount=5; tmux_local_directory local-yellow muted_yellow "${1:-.}" "$tabcount";
+local-muxler() {
+  cd ~/.config/muxler
+  local tabcount=5; tmux_local_directory local-muxler muted_yellow "${1:-.}" "$tabcount";
 }
 
 local-purple() { 
