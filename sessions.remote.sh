@@ -18,6 +18,7 @@ remote-green() {
   tmux_remote_directory "$1" "$host" "$base_path" muted_green remote-green green_ "$tabcount"
 }
 
+# Define overrides or supplement in user.sessions.remote.sh.
 if [[ -f "$WORKSPACE_ROOT/user.sessions.remote.sh" ]]; then
   . "$WORKSPACE_ROOT/user.sessions.remote.sh"
 fi

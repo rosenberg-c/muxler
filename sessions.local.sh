@@ -14,6 +14,7 @@ local-red() {
   local tabcount=9; tmux_local_directory local-red muted_red "${1:-.}" "$tabcount"; 
 }
 
+# Define overrides or supplement in user.sessions.local.sh.
 if [[ -f "$WORKSPACE_ROOT/user.sessions.local.sh" ]]; then
   . "$WORKSPACE_ROOT/user.sessions.local.sh"
 fi
