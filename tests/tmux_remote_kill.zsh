@@ -7,6 +7,8 @@ WORKSPACE_TEST_HOST=debian-dev
 socket="workspace-remote-kill-$$-$RANDOM"
 other_socket="workspace-remote-kill-other-$$-$RANDOM"
 stub_dir=$(mktemp -d)
+print 'Host debian-dev debian-new' > "$stub_dir/ssh_config"
+WORKSPACE_REMOTE_HOSTS_CONFIG=$stub_dir/ssh_config
 tmux_bin=$(whence -p tmux)
 trap '"$tmux_bin" -L "$socket" kill-server 2>/dev/null || true; "$tmux_bin" -L "$other_socket" kill-server 2>/dev/null || true; rm -rf -- "$stub_dir"' EXIT
 cat > "$stub_dir/tmux" <<EOF

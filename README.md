@@ -54,7 +54,7 @@ scp "$HOME/.config/muxler/.tmux.remote.conf" debian-dev:~/.tmux.muxler.conf
 
 The remote config supports OSC 52 clipboard copy, extended keys, and Neovim-aware pane navigation (`Ctrl-\` needs `bc`). [`examples/nvim/tmux.lua`](examples/nvim/tmux.lua) is an optional Neovim navigation example; remote Neovim needs its own clipboard setup.
 
-Run the tests with `zsh tests/sessions.zsh`, `zsh tests/tmux_config.zsh`, `zsh tests/tmux_reuse.zsh`, `zsh tests/tmux_local_kill.zsh`, and `zsh tests/tmux_remote_kill.zsh`. Remote tests stub SSH rather than connecting to your hosts, but require `debian-dev` and `debian-new` aliases in `ssh/config`.
+Run the tests with `zsh tests/sessions.zsh`, `zsh tests/tmux_config.zsh`, `zsh tests/tmux_reuse.zsh`, `zsh tests/tmux_local_kill.zsh`, and `zsh tests/tmux_remote_kill.zsh`. Remote tests stub SSH and use temporary host configs, so they do not require aliases in `ssh/config`.
 
 ## VM setup notes
 

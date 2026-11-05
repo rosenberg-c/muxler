@@ -4,6 +4,11 @@ set -eu
 source "${0:A:h:h}/.zsh_session"
 source "${0:A:h:h}/.zsh_tmux"
 source "${0:A:h}/config.zsh"
+fixture_dir=$(mktemp -d)
+host_config=$fixture_dir/ssh_config
+trap 'rm -f -- "$host_config"; rmdir -- "$fixture_dir"' EXIT
+print 'Host debian-dev debian-new' > "$host_config"
+WORKSPACE_REMOTE_HOSTS_CONFIG=$host_config
 
 fail() { print -u2 -- "$1"; exit 1; }
 [[ $WORKSPACE_ROOT == "${0:A:h:h}" ]] || fail 'workspace root follows sourced files'
@@ -24,6 +29,13 @@ fail() { print -u2 -- "$1"; exit 1; }
   remote-cyan
   [[ $user_local_loaded == yes && $user_remote_loaded == yes ]] || fail 'user aliases did not override built-ins'
 )
+
+# Test built-in shortcuts without loading the user's optional aliases.
+real_root=$WORKSPACE_ROOT
+WORKSPACE_ROOT=$fixture_dir
+source "$real_root/sessions.local.sh"
+source "$real_root/sessions.remote.sh"
+WORKSPACE_ROOT=$real_root
 
 # Capture the commands destined for iTerm without opening tabs or starting tmux.
 tmux_iterm_new_tabs() { tab_color=$1; shift; tab_commands=("$@"); }
@@ -120,10 +132,6 @@ for shortcut in remote-orange remote-cyan; do
   [[ $remote_args[5] == "${shortcut#remote-}_sample_nvim" ]] || fail "$shortcut session name"
 done
 
-host_config=$(mktemp)
-trap 'rm -f -- "$host_config"' EXIT
-original_config=$WORKSPACE_REMOTE_HOSTS_CONFIG
-WORKSPACE_REMOTE_HOSTS_CONFIG=$host_config
 cat > "$host_config" <<EOF
 Host $WORKSPACE_TEST_OTHER_HOST $WORKSPACE_TEST_HOST
 Host $WORKSPACE_TEST_HOST *.example !excluded
@@ -131,7 +139,6 @@ HostName ignored.example
 EOF
 expected_hosts=("$WORKSPACE_TEST_HOST" "$WORKSPACE_TEST_OTHER_HOST")
 [[ $(tmux_remote_hosts) == ${(F)${(o)expected_hosts}} ]] || fail 'remote host discovery and deduplication'
-WORKSPACE_REMOTE_HOSTS_CONFIG=$original_config
 
 tmux_remote_directory sample "$WORKSPACE_TEST_OTHER_HOST" '$HOME/work' muted_blue example_remote >/dev/null
 [[ $remote_args[1] == $WORKSPACE_TEST_OTHER_HOST && $remote_args[2] == '$HOME/work/sample' ]] || fail 'custom remote target'
