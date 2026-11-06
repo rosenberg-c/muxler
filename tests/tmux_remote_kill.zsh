@@ -41,7 +41,8 @@ unmarked=$(tmux_session_prepare "$PWD" magenta_old_nvim 'bg=#354f75,fg=white' nv
 unrelated=$(tmux_session_prepare "$PWD" unrelated '' main)
 tmux set-option -t "$unrelated" @workspace_remote_group remote-cyan
 
-menu=$(kill-remote-tmux <<< '')
+menu=$(kill-muxler --remote <<< '')
+[[ $(kill-remote <<< '') == "$menu" ]] || exit 1
 [[ $menu == *'debian-dev  remote-cyan'* && $menu == *'debian-new  remote-cyan'* && $menu == *'remote-green'* && $menu == *'(2 sessions)'* ]] || {
   print -u2 -- "Missing remote groups: $menu"
   exit 1
@@ -49,19 +50,34 @@ menu=$(kill-remote-tmux <<< '')
 [[ $menu != *'magenta_old'* && $menu != *'unrelated'* ]] || exit 1
 [[ -n $(tmux display-message -p -t "$blue" '#{session_id}') ]] || exit 1
 [[ -n $(tmux_session_id cyan_sample_nvim) && -n $(TMUX_TEST_SOCKET="$other_socket" tmux_session_id other_cyan_nvim) ]] || exit 1
-if kill-remote-tmux <<< '99' >/dev/null 2>&1; then
-  print -u2 'Invalid group index was accepted'
+invalid_output=$(kill-muxler --remote <<< $'99\n' 2>&1)
+if [[ $invalid_output != *'Invalid selection.'* || $invalid_output != *'remote-cyan'* ]]; then
+  print -u2 'Invalid group index did not re-prompt'
   exit 1
 fi
 
 index=
+next_index=
 for line in ${(f)menu}; do
   [[ $line == *'debian-dev  remote-cyan'* ]] && index=${line%%\)*}
+  [[ $line == *'debian-dev  remote-green'* ]] && next_index=${line%%\)*}
 done
-[[ -n $index ]] || exit 1
-kill-remote-tmux <<< "$index" >/dev/null
+[[ -n $index && -n $next_index ]] || exit 1
+if (( next_index > index )); then
+  (( next_index -= 1 ))
+fi
+selection_output=$(kill-remote <<< "99
+$index
+3
+$next_index
+" 2>&1)
+[[ $selection_output == *'Invalid selection.'*'Invalid selection.'* ]] || {
+  print -u2 'Invalid selection exited the two-group menu'
+  exit 1
+}
 [[ -z $(tmux_session_id cyan_sample_nvim) && -z $(tmux_session_id cyan_sample_notes) ]] || exit 1
-[[ -n $(tmux_session_id green_sample_nvim) && -n $(tmux_session_id magenta_old_nvim) && -n $(tmux_session_id unrelated) ]] || exit 1
+[[ -z $(tmux_session_id green_sample_nvim) ]] || exit 1
+[[ -n $(tmux_session_id magenta_old_nvim) && -n $(tmux_session_id unrelated) ]] || exit 1
 [[ -n $(TMUX_TEST_SOCKET="$other_socket" tmux_session_id other_cyan_nvim) ]] || exit 1
 
 if sh "${0:A:h:h}/scripts/tmux_remote_groups.sh" kill remote-green "$PWD" "$unmarked" >/dev/null 2>&1; then

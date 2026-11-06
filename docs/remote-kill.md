@@ -1,17 +1,21 @@
 # Kill menus and remote script
 
-`kill-local-tmux` and `kill-remote-tmux` close a selected group of sessions
-marked by the color shortcuts; unmarked tmux sessions are excluded.
+`kill-muxler --local` and `kill-muxler --remote` close a selected group of
+sessions marked by the color shortcuts; unmarked tmux sessions are excluded.
+`kill-local` and `kill-remote` are shortcuts for those modes. These functions
+are loaded by `.zsh_session`.
 
 ## Local groups
 
-`.tmux_session.local.sh` groups marked sessions by shortcut and directory and
+`kill-muxler --local` groups marked sessions by shortcut and directory and
 checks their names before listing them. It kills only the selected IDs, with
-the current session last. A blank choice cancels.
+the current session last. After each kill, the menu refreshes so another group
+can be selected. An invalid choice shows an error and prompts again; a blank
+choice exits.
 
 ## One remote menu across hosts
 
-`.tmux_session.remote.sh` queries every literal `Host` alias in `ssh/config`.
+`kill-muxler --remote` queries every literal `Host` alias in `ssh/config`.
 Entries begin with the hostname and are grouped by host, group, and directory;
 you select a group without choosing a host first. Each host is queried with:
 
@@ -35,4 +39,5 @@ requirement. The shared file *is* installed for future pane shells; see
 [Session lifecycle](session-lifecycle.md#why-install-the-shared-file-remotely).
 
 An SSH listing failure aborts the menu rather than showing a partial list.
-Blank cancels; an invalid index is rejected.
+The menu refreshes across all hosts after each kill. An invalid index shows an
+error and prompts again; blank exits.

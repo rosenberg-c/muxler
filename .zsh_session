@@ -278,4 +278,5 @@ WORKSPACE_ROOT=${${(%):-%x}:A:h}
 . "$WORKSPACE_ROOT/sessions.local.sh"
 . "$WORKSPACE_ROOT/.tmux_session.remote.sh"
 . "$WORKSPACE_ROOT/sessions.remote.sh"
+. "$WORKSPACE_ROOT/.tmux_session.kill.sh"
 . "$WORKSPACE_ROOT/.tmux_session.shared.sh"

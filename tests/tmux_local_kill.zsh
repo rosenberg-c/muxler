@@ -2,6 +2,10 @@
 set -eu
 
 source "${0:A:h:h}/.zsh_session"
+(( ! $+functions[kill-local-tmux] && ! $+functions[kill-remote-tmux] )) || {
+  print -u2 'Legacy kill commands are still defined'
+  exit 1
+}
 WORKSPACE_TABS=(nvim notes)
 socket="workspace-local-kill-$$-$RANDOM"
 tmux() {
@@ -37,25 +41,54 @@ tmux set-option -t "$stranger" @workspace_local_group blue_local
 mismatch=$(make_group local-blue "$PWD" bogus)
 tmux set-option -t "$(tmux_session_id "$mismatch")" @workspace_local_name session_wrong_nvim
 
-  menu=$(kill-local-tmux <<< '')
+menu=$(kill-muxler --local <<< '')
+[[ $(kill-local <<< '') == "$menu" ]] || exit 1
+if kill-muxler --invalid <<< '' >/dev/null 2>&1 || kill-muxler <<< '' >/dev/null 2>&1 || kill-muxler --local extra <<< '' >/dev/null 2>&1; then
+  print -u2 'Accepted invalid kill-muxler arguments'
+  exit 1
+fi
 [[ $menu == *'local-blue'* && $menu == *'local-yellow'* && $menu == *'local-purple'* && $menu == *'local-red'* && $menu == *'(3 sessions)'* ]] || {
   print -u2 'Missing or incorrect menu groups'
   exit 1
 }
 index=''
+next_index=''
 for line in ${(f)menu}; do
   [[ $line == *'local-blue'* ]] && index=${line%%\)*}
+  [[ $line == *'local-yellow'* ]] && next_index=${line%%\)*}
 done
-[[ -n $index ]] || exit 1
-  if kill-local-tmux <<< '999' >/dev/null 2>&1; then
-  print -u2 'Accepted invalid index'
+[[ -n $index && -n $next_index ]] || exit 1
+invalid_output=$(kill-muxler --local <<< $'999\n' 2>&1)
+[[ $invalid_output == *'Invalid selection.'* && $invalid_output == *'local-blue'* ]] || {
+  print -u2 'Invalid index did not re-prompt'
   exit 1
-fi
+}
 [[ -n $(tmux_session_id "$blue_nvim") ]] || exit 1
-  kill-local-tmux <<< "$index" >/dev/null
+if (( next_index > index )); then
+  (( next_index -= 1 ))
+fi
+selection_output=$(kill-local <<< "999
+$index
+$next_index
+" 2>&1)
+[[ $selection_output == *'Invalid selection.'* ]] || exit 1
 [[ -z $(tmux_session_id "$blue_nvim") && -z $(tmux_session_id "$blue_notes") && -z $(tmux_session_id "$blue_old") ]] || exit 1
-[[ -n $(tmux_session_id "$yellow_nvim") && -n $(tmux_session_id "$purple_nvim") && -n $(tmux_session_id "$red_nvim") && -n $(tmux_session_id "$old_name") && -n $(tmux_session_id unrelated_session) && -n $(tmux_session_id "$mismatch") ]] || {
+[[ -z $(tmux_session_id "$yellow_nvim") ]] || exit 1
+[[ -n $(tmux_session_id "$purple_nvim") && -n $(tmux_session_id "$red_nvim") && -n $(tmux_session_id "$old_name") && -n $(tmux_session_id unrelated_session) && -n $(tmux_session_id "$mismatch") ]] || {
   print -u2 'Killed unrelated local sessions'
+  exit 1
+}
+two_group_menu=$(kill-muxler --local <<< '')
+[[ $two_group_menu == *'(1 sessions)'* && $two_group_menu == *'local-purple'* && $two_group_menu == *'local-red'* ]] || exit 1
+for line in ${(f)two_group_menu}; do
+  [[ $line == *'local-purple'* ]] && index=${line%%\)*}
+done
+selection_output=$(kill-muxler --local <<< "3
+$index
+" 2>&1)
+[[ $selection_output == *'Invalid selection.'* ]] || exit 1
+[[ -z $(tmux_session_id "$purple_nvim") && -n $(tmux_session_id "$red_nvim") ]] || {
+  print -u2 'Invalid selection exited the two-group menu'
   exit 1
 }
 print 'isolated local tmux kill test passed'

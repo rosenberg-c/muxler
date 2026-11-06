@@ -12,11 +12,11 @@ remote-cyan .               # Remote home directory on debian-dev
 remote-cyan path/to/project # Relative to the remote home directory
 ```
 
-Local colors: `local-blue`, `local-red`, `local-yellow`, `local-purple`. Remote colors: `remote-magenta`, `remote-orange`, `remote-cyan`, `remote-green`. Remote shortcuts default to the `debian-dev` SSH alias; they accept relative paths without `..` segments. Run `kill-local-tmux` or `kill-remote-tmux` to select and close a group of managed sessions; the remote menu lists groups across hosts with hostnames first. Other tmux sessions are left alone.
+Local colors: `local-blue`, `local-red`, `local-yellow`, `local-purple`. Remote colors: `remote-magenta`, `remote-orange`, `remote-cyan`, `remote-green`. Remote shortcuts default to the `debian-dev` SSH alias; they accept relative paths without `..` segments. Run `kill-local` or `kill-remote` (or `kill-muxler --local|--remote`) to select and close a group of managed sessions; the remote menu lists groups across hosts with hostnames first. Other tmux sessions are left alone.
 
 For an explanation of the scripts and how they work together, see [How Muxler fits together](docs/overview.md), [Session lifecycle](docs/session-lifecycle.md), and [Kill menus and remote script](docs/remote-kill.md).
 
-Edit `WORKSPACE_TABS` in `.zsh_session` to choose tab names (nine by default). Shortcuts set their tab count in `sessions.local.sh` and `sessions.remote.sh`; `local-yellow` opens five tabs by default, while the others open nine. Set `tabcount=4` to open the first four tabs (`nvim`, `lazygit`, `opencode`, `tab4`). Keep `tabcount` between 1 and the number of names in `WORKSPACE_TABS`. Set each remote shortcut's `host` in `sessions.remote.sh`; `kill-remote-tmux` lists the hosts from `ssh/config`.
+Edit `WORKSPACE_TABS` in `.zsh_session` to choose tab names (nine by default). Shortcuts set their tab count in `sessions.local.sh` and `sessions.remote.sh`; `local-yellow` opens five tabs by default, while the others open nine. Set `tabcount=4` to open the first four tabs (`nvim`, `lazygit`, `opencode`, `tab4`). Keep `tabcount` between 1 and the number of names in `WORKSPACE_TABS`. Set each remote shortcut's `host` in `sessions.remote.sh`; `kill-remote` lists the hosts from `ssh/config`.
 
 For personal shortcuts, create `user.sessions.local.sh` or `user.sessions.remote.sh`. `.zsh_session` loads each file if present, after the built-in shortcuts, so you can add or override aliases without editing tracked files. Both user files are gitignored. For example, in `user.sessions.local.sh`:
 
