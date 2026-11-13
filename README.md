@@ -4,7 +4,7 @@ Muxler is my iTerm2 and tmux workspace setup for local and remote development. I
 
 ## Use
 
-Requires zsh, tmux, and iTerm2; remote sessions also need SSH access. Shortcuts open one tmux session per tab and reconnect to existing sessions when run again.
+Requires zsh, tmux, and iTerm2; remote sessions also need SSH access. Shortcuts open one tmux session per tab or pane and reconnect to existing sessions when run again.
 
 ```zsh
 local-blue path/to/project  # Relative to the current directory
@@ -22,6 +22,21 @@ For personal shortcuts, create `user.sessions.local.sh` or `user.sessions.remote
 
 ```zsh
 local-blue() { local tabcount=4; tmux_local_directory local-blue muted_blue "${1:-.}" "$tabcount"; }
+```
+
+To put positions 3 and 4 side by side in one iTerm tab, pass an optional split pair after the tab count. The first position still uses the invoking terminal; split pairs must be adjacent positions between 2 and `tabcount`.
+
+```zsh
+local-octop() {
+  cd ~/personal/dev/octop || return
+  local tabcount=6 split='3,4'
+  tmux_local_directory local-octop muted_cyan "${1:-.}" "$tabcount" "$split"
+}
+
+remote-octop() {
+  local host=debian-dev base_path='$HOME' tabcount=6 split='3,4'
+  tmux_remote_directory "${1:-.}" "$host" "$base_path" muted_cyan remote-octop octop_ "$tabcount" "$split"
+}
 ```
 
 ## Setup

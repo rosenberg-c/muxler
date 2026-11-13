@@ -1,6 +1,6 @@
 tmux_remote_project() {
   local tabcount=${8:-${#WORKSPACE_TABS}}
-  tmux_remote_tabs "$tabcount" "${@:1:7}"
+  tmux_remote_tabs "$tabcount" "${@:1:7}" "${9:-}"
 }
 WORKSPACE_REMOTE_GROUPS_SCRIPT=${${(%):-%x}:A:h}/scripts/tmux_remote_groups.sh
 
@@ -31,6 +31,7 @@ tmux_remote_directory() {
   local directory=$1 host=$2 base_path=$3 iterm_color=$4 command_name=$5
   local session_namespace=${6:-}
   local tabcount=${7:-${#WORKSPACE_TABS}}
+  local split=${8:-}
   if [[ "$directory" == . ]]; then
     local root_name=${base_path##*/}
     local session_key=$root_name
@@ -39,7 +40,7 @@ tmux_remote_directory() {
       session_key=main
     fi
     [[ -n "$session_namespace" ]] && session_key='%2E'
-    tmux_remote_project "$host" "$base_path" "$root_name" "$iterm_color" white "${session_namespace}${session_key}" "$command_name" "$tabcount"
+    tmux_remote_project "$host" "$base_path" "$root_name" "$iterm_color" white "${session_namespace}${session_key}" "$command_name" "$tabcount" "$split"
     return
   fi
   if [[ -z "$directory" || "$directory" == /* || "$directory" == */ ||
@@ -53,5 +54,5 @@ tmux_remote_directory() {
   # Escape percent first so nested paths cannot collide with literal directory names.
   local session_key=${directory//\%/%25}
   session_key=${session_key//\//%2F}
-  tmux_remote_project "$host" "$base_path/$directory" "$directory" "$iterm_color" white "${session_namespace}${session_key}" "$command_name" "$tabcount"
+  tmux_remote_project "$host" "$base_path/$directory" "$directory" "$iterm_color" white "${session_namespace}${session_key}" "$command_name" "$tabcount" "$split"
 }

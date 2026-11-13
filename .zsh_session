@@ -177,10 +177,11 @@ tmux_local() {
   fi
 }
 
-# Write commands into new iTerm2 tabs; each tab attaches to its tmux session.
+# Write commands into new iTerm2 tabs or a configured split; each pane attaches to its tmux session.
 tmux_iterm_new_tabs() {
-  local iterm_color=$1 command_text
-  shift
+  local iterm_color=$1 split=$2 command_text position=2
+  local split_second=${split#*,}
+  shift 2
   {
     print -r -- 'tell application "iTerm2"'
     print -r -- '  tell current window'
@@ -190,14 +191,32 @@ tmux_iterm_new_tabs() {
       command_text=${command_text//\"/\\\"}
       command_text=${command_text//$'\n'/\\n}
       command_text=${command_text//$'\r'/\\r}
-      print -r -- '    set newTab to (create tab with default profile)'
-      print -r -- '    tell current session of newTab'
+      if [[ -n $split && $position == $split_second ]]; then
+        print -r -- '    tell current session of newTab'
+        print -r -- '      set newSession to (split vertically with default profile)'
+        print -r -- '    end tell'
+        print -r -- '    tell newSession'
+      else
+        print -r -- '    set newTab to (create tab with default profile)'
+        print -r -- '    tell current session of newTab'
+      fi
       print -r -- "      write text \"$command_text\""
       print -r -- '    end tell'
+      (( position++ ))
     done
     print -r -- '  end tell'
     print -r -- 'end tell'
   } | osascript
+}
+
+tmux_validate_split() {
+  local split=$1 tabcount=$2
+  [[ -z $split ]] && return 0
+  local first=${split%,*} second=${split#*,}
+  if [[ $split != <->,<-> ]] || (( first < 2 || second != first + 1 || second > tabcount )); then
+    print -u2 -- "split must be adjacent positions from 2 to $tabcount (e.g. 3,4)"
+    return 1
+  fi
 }
 
 tmux_local_tabs() {
@@ -208,6 +227,7 @@ tmux_local_tabs() {
   local tmux_fg_color=${5:-white}
   local local_group=${6:-}
   local tabcount=${7:-${#WORKSPACE_TABS}}
+  local split=${8:-}
 
   if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
     echo "usage: tmux_local_tabs <project-dir> [project-name] [iterm-color] [tmux-bg] [tmux-fg]"
@@ -217,6 +237,7 @@ tmux_local_tabs() {
     print -u2 -- "tabcount must be between 1 and ${#WORKSPACE_TABS}"
     return 1
   fi
+  tmux_validate_split "$split" "$tabcount" || return
 
   local status_style="bg=$tmux_bg_color,fg=$tmux_fg_color"
   iterm_reset
@@ -227,7 +248,7 @@ tmux_local_tabs() {
   for window_name in "${selected_tabs[@]:1}"; do
     commands+=("tmux_local ${(q)target_dir} ${(q)project_name} ${(q)window_name} ${(q)status_style} ${(q)local_group}")
   done
-  tmux_iterm_new_tabs "$iterm_color" "${commands[@]}" || return
+  tmux_iterm_new_tabs "$iterm_color" "$split" "${commands[@]}" || return
   # Attach in the invoking shell, not in a newly opened tab.
   tmux_local "$target_dir" "$project_name" "$WORKSPACE_TABS[1]" "$status_style" "$local_group"
 }
@@ -236,6 +257,7 @@ tmux_remote_tabs() {
   local tab_count=$1 remote_host=$2 project_path=$3 project_name=$4
   local iterm_color=$5 tmux_fg_color=${6:-white}
   local remote_group=${8:-}
+  local split=${9:-}
   if [[ $tab_count != <-> ]] || (( tab_count < 1 || tab_count > ${#WORKSPACE_TABS} )); then
     print -u2 -- "tabcount must be between 1 and ${#WORKSPACE_TABS}"
     return 1
@@ -244,6 +266,7 @@ tmux_remote_tabs() {
     echo "usage: tmux_remote_project <remote-host> <project-path> <name> <color> [foreground]"
     return 1
   fi
+  tmux_validate_split "$split" "$tab_count" || return
 
   local path_for_remote=${project_path/#$HOME/\$HOME}
   local session_name=${7:-${path_for_remote##*/}}
@@ -268,7 +291,7 @@ tmux_remote_tabs() {
   "iterm_${iterm_color}"
   echo "=== ${project_name} ==="
   if (( ${#commands} )); then
-    tmux_iterm_new_tabs "$iterm_color" "${commands[@]}" || return
+    tmux_iterm_new_tabs "$iterm_color" "$split" "${commands[@]}" || return
   fi
   tmux_connect "$remote_host" "${sessions[1]}"
 }

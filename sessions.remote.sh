@@ -14,8 +14,8 @@ remote-cyan() {
 }
 
 remote-green() {
-  local host=debian-dev base_path='$HOME' tabcount=9
-  tmux_remote_directory "$1" "$host" "$base_path" muted_green remote-green green_ "$tabcount"
+  local host=debian-dev base_path='$HOME' tabcount=9 split='3,4'
+  tmux_remote_directory "$1" "$host" "$base_path" muted_green remote-green green_ "$tabcount" "$split"
 }
 
 # Define overrides or supplement in user.sessions.remote.sh.

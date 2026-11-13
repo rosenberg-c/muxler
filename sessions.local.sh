@@ -1,6 +1,6 @@
 local-muxler() {
   cd ~/.config/muxler
-  local tabcount=5; tmux_local_directory local-muxler muted_yellow "${1:-.}" "$tabcount";
+  local tabcount=5 split='3,4'; tmux_local_directory local-muxler muted_yellow "${1:-.}" "$tabcount" "$split";
 }
 
 local-purple() { 

@@ -6,7 +6,7 @@ source "${0:A:h:h}/.zsh_tmux"
 source "${0:A:h}/config.zsh"
 fixture_dir=$(mktemp -d)
 host_config=$fixture_dir/ssh_config
-trap 'rm -f -- "$host_config"; rmdir -- "$fixture_dir"' EXIT
+trap 'rm -f -- "$host_config" "$fixture_dir/layout.applescript"; rmdir -- "$fixture_dir"' EXIT
 print 'Host debian-dev debian-new' > "$host_config"
 WORKSPACE_REMOTE_HOSTS_CONFIG=$host_config
 
@@ -38,7 +38,8 @@ source "$real_root/sessions.remote.sh"
 WORKSPACE_ROOT=$real_root
 
 # Capture the commands destined for iTerm without opening tabs or starting tmux.
-tmux_iterm_new_tabs() { tab_color=$1; shift; tab_commands=("$@"); }
+functions -c tmux_iterm_new_tabs real_tmux_iterm_new_tabs
+tmux_iterm_new_tabs() { tab_color=$1; tab_split=$2; shift 2; tab_commands=("$@"); }
 tmux_local() { local_args=("$@"); }
 
 local-red >/dev/null
@@ -52,14 +53,31 @@ tmux_local_directory local-blue muted_blue . 3 >/dev/null
 [[ ${#tab_commands} == 2 && $tab_commands[2] == *'opencode'* && $local_args[3] == nvim ]] || fail 'local alias three-tab limit'
 tmux_local_directory local-blue muted_blue . 4 >/dev/null
 [[ ${#tab_commands} == 3 && $tab_commands[3] == *'tab4'* && $local_args[3] == nvim ]] || fail 'local alias first four tabs'
+tmux_local_directory local-blue muted_blue . 6 3,4 >/dev/null
+[[ $tab_split == 3,4 && ${#tab_commands} == 5 && $tab_commands[2] == *'opencode'* && $tab_commands[3] == *'tab4'* ]] || fail 'local alias split positions'
+tmux_local_directory local-blue muted_blue . 4 >/dev/null
+[[ -z $tab_split ]] || fail 'default local layout still split'
 tmux_local_directory local-blue muted_blue . 1 >/dev/null
 [[ ${#tab_commands} == 0 && $local_args[3] == nvim ]] || fail 'local alias one-tab limit'
 for invalid in 0 10 abc; do
   if tmux_local_directory local-blue muted_blue . "$invalid" >/dev/null 2>&1; then fail "invalid local tab limit accepted: $invalid"; fi
 done
+for invalid in 1,2 3,3 3,5 5,6 3,7 abc '3,4,5'; do
+  if tmux_local_directory local-blue muted_blue . 5 "$invalid" >/dev/null 2>&1; then fail "invalid local split accepted: $invalid"; fi
+done
 
-for shortcut in local-blue local-yellow local-purple; do
+script_file=$fixture_dir/layout.applescript
+osascript() { cat > "$script_file"; }
+real_tmux_iterm_new_tabs muted_blue 3,4 'echo two' 'echo three' 'echo four' 'echo five'
+[[ $(grep -c 'create tab with default profile' "$script_file") == 3 && $(grep -c 'split vertically with default profile' "$script_file") == 1 ]] || fail 'split layout creates three tabs and one side-by-side pane'
+[[ $(grep -c 'write text' "$script_file") == 4 ]] || fail 'split layout writes every command'
+[[ $(<"$script_file") == *'echo three'*'split vertically with default profile'*'echo four'* ]] || fail 'split layout puts positions 3 and 4 together'
+real_tmux_iterm_new_tabs muted_blue '' 'echo two' 'echo three'
+[[ $(grep -c 'create tab with default profile' "$script_file") == 2 && $(grep -c 'split vertically' "$script_file") == 0 ]] || fail 'default layout creates separate tabs'
+
+for shortcut in local-blue local-muxler local-purple; do
   local_color=${shortcut#local-}
+  [[ $shortcut == local-muxler ]] && local_color=yellow
   "${shortcut}" >/dev/null
   [[ $tab_color == "muted_${local_color}" && $local_args[1] == "$PWD" && $local_args[3] == nvim ]] || fail "$shortcut tabs"
   [[ $local_args[4] == "bg=$(tmux_status_bg_color "muted_${local_color}"),fg=white" ]] || fail "$shortcut status color"
@@ -67,7 +85,7 @@ for shortcut in local-blue local-yellow local-purple; do
   [[ $local_args[2] != "$(tmux_local_project_name local-red "$PWD")" ]] || fail 'local shortcut collision'
 done
 
-for shortcut in local-red local-blue local-yellow local-purple; do
+for shortcut in local-red local-blue local-muxler local-purple; do
   "$shortcut" tests >/dev/null
   [[ $local_args[1] == "${0:A:h}" && $local_args[2] == "$(tmux_local_project_name "$shortcut" "${0:A:h}")" && $local_args[5] == "$shortcut" ]] || fail "$shortcut relative directory"
 done
@@ -98,6 +116,15 @@ tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_
 [[ ${#remote_args} == 7 && $remote_args[7] == 'magenta_%2E_opencode' && ${#tab_commands} == 2 ]] || fail 'remote alias three-tab limit'
 tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_ 4 >/dev/null
 [[ ${#remote_args} == 8 && $remote_args[8] == 'magenta_%2E_tab4' && ${#tab_commands} == 3 ]] || fail 'remote alias first four tabs'
+tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_ 6 3,4 >/dev/null
+[[ $tab_split == 3,4 && ${#remote_args} == 10 && ${#tab_commands} == 5 && $tab_commands[2] == *'opencode'* && $tab_commands[3] == *'tab4'* ]] || fail 'remote root split positions'
+tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 6 3,4 >/dev/null
+[[ $tab_split == 3,4 && $remote_args[5] == magenta_sample_nvim && ${#tab_commands} == 5 ]] || fail 'remote directory split positions'
+remote_args=(sentinel)
+for invalid in 1,2 3,3 3,5 5,6 3,7 abc '3,4,5'; do
+  if tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 5 "$invalid" >/dev/null 2>&1; then fail "invalid remote split accepted: $invalid"; fi
+done
+[[ $remote_args[1] == sentinel ]] || fail 'invalid remote split prepared sessions'
 tab_commands=(sentinel)
 tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 1 >/dev/null
 [[ ${#remote_args} == 5 && $tab_commands[1] == sentinel && $connect_args[2] == magenta_sample_nvim ]] || fail 'remote alias one-tab limit'
