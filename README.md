@@ -12,7 +12,7 @@ remote-cyan .               # Remote home directory on debian-dev
 remote-cyan path/to/project # Relative to the remote home directory
 ```
 
-Local colors: `local-blue`, `local-red`, `local-yellow`, `local-purple`. Remote colors: `remote-magenta`, `remote-orange`, `remote-cyan`, `remote-green`. Remote shortcuts default to the `debian-dev` SSH alias; they accept relative paths without `..` segments. Run `kill-local` or `kill-remote` (or `kill-muxler --local|--remote`) to select and close a group of managed sessions; the remote menu lists groups across hosts with hostnames first. Other tmux sessions are left alone.
+Local colors: `local-blue`, `local-red`, `local-yellow`, `local-purple`. Remote colors: `remote-magenta`, `remote-orange`, `remote-cyan`, `remote-green`. Remote shortcuts default to the `debian-dev` SSH alias; they accept relative paths without `..` segments. Run `kill-local` or `kill-remote` (or `kill-muxler --local|--remote`) to select and close a group of managed sessions; the remote menu lists groups across hosts with hostnames first. Other tmux sessions are left alone. Inside a managed local or remote tmux pane, `kill-session` closes all tabs' sessions in that shortcut's group and directory on its host, without a menu. If the current session has no valid workspace markers, `kill-session` closes only that tmux session; unrelated sessions are left alone. Remote panes receive the command when the next remote shortcut refreshes the shared hook.
 
 For an explanation of the scripts and how they work together, see [How Muxler fits together](docs/overview.md), [Session lifecycle](docs/session-lifecycle.md), and [Kill menus and remote script](docs/remote-kill.md).
 

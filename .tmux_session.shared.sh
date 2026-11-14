@@ -1,4 +1,48 @@
 # Shared Bash/Zsh prompt setup. No input is sent to tmux panes.
+# Keep this file sourceable by sh during remote setup; pane shells use Bash/Zsh.
+tmux_kill_session_matches() {
+  local id=$1 group_option=$2 name_option=$3 group=$4 dir=$5 name marked_name
+  [ "$(tmux show-option -qv -t "$id" "$group_option")" = "$group" ] || return 1
+  [ "$(tmux show-option -qv -t "$id" @session_target_dir)" = "$dir" ] || return 1
+  name=$(tmux display-message -p -t "$id" '#{session_name}') || return 1
+  marked_name=$(tmux show-option -qv -t "$id" "$name_option") || return 1
+  [ -n "$marked_name" ] && [ "$name" = "$marked_name" ]
+}
+
+tmux_kill_session() {
+  if [ "$#" -ne 0 ] || [ -z "${TMUX:-}" ] || [ -z "${TMUX_PANE:-}" ]; then
+    printf '%s\n' 'usage: kill-session (from inside tmux)' >&2
+    return 1
+  fi
+  local current_id group_option name_option group dir ids id
+  current_id=$(tmux display-message -p -t "$TMUX_PANE" '#{session_id}') || return 1
+  [ -n "$current_id" ] || return 1
+  group_option=@workspace_local_group name_option=@workspace_local_name
+  group=$(tmux show-option -qv -t "$current_id" "$group_option") || return 1
+  if [ -z "$group" ]; then
+    group_option=@workspace_remote_group name_option=@workspace_remote_name
+    group=$(tmux show-option -qv -t "$current_id" "$group_option") || return 1
+  fi
+  dir=$(tmux show-option -qv -t "$current_id" @session_target_dir) || return 1
+  if [ -z "$group" ] || [ -z "$dir" ] || ! tmux_kill_session_matches "$current_id" "$group_option" "$name_option" "$group" "$dir"; then
+    tmux kill-session -t "$current_id"
+    return $?
+  fi
+  ids=$(tmux list-sessions -F '#{session_id}') || return 1
+  while IFS= read -r id; do
+    [ -n "$id" ] && [ "$id" != "$current_id" ] || continue
+    tmux_kill_session_matches "$id" "$group_option" "$name_option" "$group" "$dir" || continue
+    tmux kill-session -t "$id" || return 1
+  done <<EOF
+$ids
+EOF
+  tmux_kill_session_matches "$current_id" "$group_option" "$name_option" "$group" "$dir" || return 1
+  tmux kill-session -t "$current_id"
+}
+if [ -n "${ZSH_VERSION:-}" ] || { [ -n "${BASH_VERSION:-}" ] && ! shopt -oq posix; }; then
+  eval 'kill-session() { tmux_kill_session "$@"; }'
+fi
+
 # Find a session by its exact name, including names containing colons.
 tmux_session_id() {
   local session_name=$1 session_info

@@ -3,7 +3,12 @@
 `kill-muxler --local` and `kill-muxler --remote` close a selected group of
 sessions marked by the color shortcuts; unmarked tmux sessions are excluded.
 `kill-local` and `kill-remote` are shortcuts for those modes. These functions
-are loaded by `.zsh_session`.
+are loaded by `.zsh_session`. From a managed local or remote pane,
+`kill-session` closes every marked tab session with the same shortcut group and
+directory on that host, with the current session last. It requires no arguments
+and reports an error outside tmux. In an unmarked session, it closes only the
+current tmux session. Remote pane shells load it from `.tmux_session.shared.sh`;
+the next remote shortcut refreshes that file on the host.
 
 ## Local groups
 

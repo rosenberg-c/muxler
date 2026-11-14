@@ -34,6 +34,9 @@ tmux_local "$PWD" "$(tmux_local_project_name local-blue "$PWD")" nvim 'bg=#354f7
 yellow_nvim=$(make_group local-yellow "$PWD" nvim)
 purple_nvim=$(make_group local-purple "$PWD" nvim)
 red_nvim=$(make_group local-red "$PWD" nvim)
+red_notes=$(make_group local-red "$PWD" notes)
+tmux_local "$PWD" "$(tmux_local_project_name local-red "$PWD")" nvim 'bg=#354f75,fg=white' local-red >/dev/null
+tmux_local "$PWD" "$(tmux_local_project_name local-red "$PWD")" notes 'bg=#354f75,fg=white' local-red >/dev/null
 old_name=session_${PWD:t}_nvim
 tmux_session_prepare "$PWD" "$old_name" 'bg=#5f3030,fg=white' nvim >/dev/null
 stranger=$(tmux_session_prepare "$PWD" unrelated_session '' main)
@@ -89,6 +92,28 @@ $index
 [[ $selection_output == *'Invalid selection.'* ]] || exit 1
 [[ -z $(tmux_session_id "$purple_nvim") && -n $(tmux_session_id "$red_nvim") ]] || {
   print -u2 'Invalid selection exited the two-group menu'
+  exit 1
+}
+if kill-session >/dev/null 2>&1 || kill-session extra >/dev/null 2>&1; then
+  print -u2 'kill-session accepted a call outside tmux or with arguments'
+  exit 1
+fi
+red_id=$(tmux_session_id "$red_nvim")
+red_pane=$(tmux list-panes -t "$red_id" -F '#{pane_id}')
+if TMUX=isolated TMUX_PANE="$red_pane" kill-session extra >/dev/null 2>&1; then
+  print -u2 'kill-session accepted arguments inside tmux'
+  exit 1
+fi
+[[ -n $(tmux_session_id "$red_nvim") ]] || exit 1
+TMUX=isolated TMUX_PANE="$red_pane" kill-session
+[[ -z $(tmux_session_id "$red_nvim") && -z $(tmux_session_id "$red_notes") && -n $(tmux_session_id "$old_name") && -n $(tmux_session_id unrelated_session) && -n $(tmux_session_id "$mismatch") ]] || {
+  print -u2 'kill-session killed the wrong session'
+  exit 1
+}
+old_pane=$(tmux list-panes -t "$old_name" -F '#{pane_id}')
+TMUX=isolated TMUX_PANE="$old_pane" kill-session
+[[ -z $(tmux_session_id "$old_name") && -n $(tmux_session_id unrelated_session) && -n $(tmux_session_id "$mismatch") ]] || {
+  print -u2 'Unmarked fallback killed another session'
   exit 1
 }
 print 'isolated local tmux kill test passed'

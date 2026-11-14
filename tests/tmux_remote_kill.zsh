@@ -37,6 +37,7 @@ blue=$(make_remote remote-cyan "$PWD" cyan_sample_nvim)
 second=$(make_remote remote-cyan "$PWD" cyan_sample_notes)
 green=$(make_remote remote-green "$PWD" green_sample_nvim)
 other=$(TMUX_TEST_SOCKET="$other_socket" make_remote remote-cyan "$PWD" other_cyan_nvim)
+other_notes=$(TMUX_TEST_SOCKET="$other_socket" make_remote remote-cyan "$PWD" other_cyan_notes)
 unmarked=$(tmux_session_prepare "$PWD" magenta_old_nvim 'bg=#354f75,fg=white' nvim)
 unrelated=$(tmux_session_prepare "$PWD" unrelated '' main)
 tmux set-option -t "$unrelated" @workspace_remote_group remote-cyan
@@ -88,4 +89,26 @@ if sh "${0:A:h:h}/scripts/tmux_remote_groups.sh" kill remote-cyan "$PWD" "$green
   print -u2 'Session from another group was killable'
   exit 1
 fi
+remote_pane=$(TMUX_TEST_SOCKET="$other_socket" tmux list-panes -t "$other" -F '#{pane_id}')
+sh -c '. "$1"' sh "${0:A:h:h}/.tmux_session.shared.sh"
+if TMUX_TEST_SOCKET="$other_socket" babash -c '. "$1"; kill-session' bash "${0:A:h:h}/.tmux_session.shared.sh" >/dev/null 2>&1; then
+  print -u2 'Remote kill-session accepted a call outside tmux'
+  exit 1
+fi
+if TMUX_TEST_SOCKET="$other_socket" TMUX=isolated TMUX_PANE="$remote_pane" bash -c '. "$1"; kill-session extra' sh "${0:A:h:h}/.tmux_session.shared.sh" >/dev/null 2>&1; then
+  print -u2 'Remote kill-session accepted arguments'
+  exit 1
+fi
+[[ -n $(TMUX_TEST_SOCKET="$other_socket" tmux_session_id other_cyan_nvim) ]] || exit 1
+TMUX_TEST_SOCKET="$other_socket" TMUX=isolated TMUX_PANE="$remote_pane" bash -c '. "$1"; kill-session' sh "${0:A:h:h}/.tmux_session.shared.sh"
+[[ -z $(TMUX_TEST_SOCKET="$other_socket" tmux_session_id other_cyan_nvim 2>/dev/null) && -z $(TMUX_TEST_SOCKET="$other_socket" tmux_session_id other_cyan_notes 2>/dev/null) && -n $(tmux_session_id magenta_old_nvim) && -n $(tmux_session_id unrelated) ]] || {
+  print -u2 'Remote kill-session killed the wrong session or host'
+  exit 1
+}
+unmarked_pane=$(tmux list-panes -t "$unmarked" -F '#{pane_id}')
+TMUX=isolated TMUX_PANE="$unmarked_pane" bash -c '. "$1"; kill-session' bash "${0:A:h:h}/.tmux_session.shared.sh"
+[[ -z $(tmux_session_id magenta_old_nvim) && -n $(tmux_session_id unrelated) ]] || {
+  print -u2 'Remote unmarked fallback killed another session'
+  exit 1
+}
 print 'isolated remote tmux kill test passed'
