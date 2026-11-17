@@ -41,7 +41,7 @@ remote-octop() {
 
 ## Setup
 
-Clone or move this repo to `~/.config/muxler`, then add to `~/.zshrc`:
+Clone the repo anywhere and run `make install` from the repo to symlink it to `~/.config/muxler` (the command refuses to replace an existing path). Alternatively, move the repo to `~/.config/muxler`. Then add to `~/.zshrc`:
 
 ```zsh
 source "$HOME/.config/muxler/.zsh_session"
