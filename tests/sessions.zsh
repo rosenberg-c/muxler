@@ -107,6 +107,9 @@ tmux_connect() { connect_args=("$@"); }
 
 [[ $(tmux_remote_hosts) == *debian-dev* ]] || fail 'default remote host discovery'
 
+remote-magenta >/dev/null
+[[ $remote_args[1] == debian-dev && $remote_args[2] == '$HOME' ]] || fail 'remote-magenta default root path'
+[[ $remote_args[5] == 'magenta_%2E_nvim' && $connect_args[2] == 'magenta_%2E_nvim' ]] || fail 'remote-magenta default root connection'
 remote-magenta . >/dev/null
 [[ $remote_args[1] == debian-dev && $remote_args[2] == '$HOME' ]] || fail 'remote-magenta root path'
 [[ $remote_args[3] == "bg=$(tmux_status_bg_color muted_magenta),fg=white" && $tab_color == muted_magenta ]] || fail 'remote-magenta colors'
@@ -154,7 +157,9 @@ remote-magenta another/other >/dev/null
 remote-magenta 'path%2Fto%2Fother' >/dev/null
 [[ $remote_args[5] == 'magenta_path%252Fto%252Fother_nvim' ]] || fail 'escaped nested name collides with literal name'
 
-for shortcut in remote-orange remote-cyan; do
+for shortcut in remote-orange remote-cyan remote-green; do
+  "$shortcut" >/dev/null
+  [[ $remote_args[2] == '$HOME' && $remote_args[5] == "${shortcut#remote-}_%2E_nvim" ]] || fail "$shortcut default root"
   "$shortcut" sample >/dev/null
   [[ $remote_args[5] == "${shortcut#remote-}_sample_nvim" ]] || fail "$shortcut session name"
 done
@@ -167,12 +172,15 @@ EOF
 expected_hosts=("$WORKSPACE_TEST_HOST" "$WORKSPACE_TEST_OTHER_HOST")
 [[ $(tmux_remote_hosts) == ${(F)${(o)expected_hosts}} ]] || fail 'remote host discovery and deduplication'
 
+tmux_remote_directory . "$WORKSPACE_TEST_OTHER_HOST" '$HOME/work' muted_blue example_remote >/dev/null
+[[ $remote_args[1] == $WORKSPACE_TEST_OTHER_HOST && $remote_args[2] == '$HOME/work' ]] || fail 'custom remote base path'
 tmux_remote_directory sample "$WORKSPACE_TEST_OTHER_HOST" '$HOME/work' muted_blue example_remote >/dev/null
 [[ $remote_args[1] == $WORKSPACE_TEST_OTHER_HOST && $remote_args[2] == '$HOME/work/sample' ]] || fail 'custom remote target'
 
 tmux_remote_project "$WORKSPACE_TEST_HOST" '$HOME/work/sample' sample muted_blue >/dev/null
 [[ $remote_args[3] == 'bg=#354f75,fg=white' && $connect_args[2] == sample_nvim ]] || fail 'alternate remote session color'
 
+if remote-magenta '' >/dev/null 2>&1; then fail 'remote-magenta accepted an empty path'; fi
 if remote-magenta ../bad >/dev/null 2>&1; then fail 'remote-magenta accepted an invalid path'; fi
 for invalid in /absolute parent/../other parent/./other ./child parent//other parent/; do
   if remote-magenta "$invalid" >/dev/null 2>&1; then fail "remote-magenta accepted: $invalid"; fi
