@@ -149,6 +149,7 @@ tmux_local() {
   local window_name=$3
   local status_style=$4
   local local_group=${5:-}
+  local title_prefix=${6:-}
   local session_name="session_${project_name}"
 
   if [[ -n "$window_name" ]]; then
@@ -165,6 +166,9 @@ tmux_local() {
 
   local session_id
   session_id=$(tmux_session_prepare "$target_dir" "$session_name" "$status_style" "${window_name:-main}") || return
+  if [[ -n "$title_prefix" ]]; then
+    tmux_session_set_title "$session_id" "$title_prefix" "${window_name:-main}" || return
+  fi
   if [[ -n "$local_group" ]]; then
     tmux set-option -t "$session_id" @workspace_local_group "$local_group" || return
     tmux set-option -t "$session_id" @workspace_local_name "$session_name" || return
@@ -234,6 +238,7 @@ tmux_local_tabs() {
   local local_group=${6:-}
   local tabcount=${7:-${#WORKSPACE_TABS}}
   local split=${8:-}
+  local title_prefix=${9:-}
 
   if [[ -z "$target_dir" || ! -d "$target_dir" ]]; then
     echo "usage: tmux_local_tabs <project-dir> [project-name] [iterm-color] [tmux-bg] [tmux-fg]"
@@ -252,11 +257,11 @@ tmux_local_tabs() {
   local window_name
   local -a commands=() selected_tabs=("${WORKSPACE_TABS[@]:0:$tabcount}")
   for window_name in "${selected_tabs[@]:1}"; do
-    commands+=("tmux_local ${(q)target_dir} ${(q)project_name} ${(q)window_name} ${(q)status_style} ${(q)local_group}")
+    commands+=("tmux_local ${(q)target_dir} ${(q)project_name} ${(q)window_name} ${(q)status_style} ${(q)local_group} ${(q)title_prefix}")
   done
   tmux_iterm_new_tabs "$iterm_color" "$split" "${commands[@]}" || return
   # Attach in the invoking shell, not in a newly opened tab.
-  tmux_local "$target_dir" "$project_name" "$WORKSPACE_TABS[1]" "$status_style" "$local_group"
+  tmux_local "$target_dir" "$project_name" "$WORKSPACE_TABS[1]" "$status_style" "$local_group" "$title_prefix"
 }
 
 tmux_remote_tabs() {
@@ -264,6 +269,7 @@ tmux_remote_tabs() {
   local iterm_color=$5 tmux_fg_color=${6:-white}
   local remote_group=${8:-}
   local split=${9:-}
+  local title_prefix=${10:-}
   if [[ $tab_count != <-> ]] || (( tab_count < 1 || tab_count > ${#WORKSPACE_TABS} )); then
     print -u2 -- "tabcount must be between 1 and ${#WORKSPACE_TABS}"
     return 1
@@ -282,24 +288,25 @@ tmux_remote_tabs() {
   local tmux_bg_color=$(tmux_status_bg_color "$iterm_color")
   local status_style="bg=$tmux_bg_color,fg=$tmux_fg_color"
   local window_name remote_session
-  local -a sessions=() commands=()
+  local -a sessions=() commands=() prepare_args=()
   for window_name in "${WORKSPACE_TABS[@]:0:$tab_count}"; do
     remote_session="${session_name}_${window_name}"
     sessions+=("$remote_session")
+    prepare_args+=("$remote_session" "$window_name")
     if [[ "$window_name" != "$WORKSPACE_TABS[1]" ]]; then
-      commands+=("tmux_connect ${(q)remote_host} ${(q)remote_session}")
+      commands+=("tmux_connect ${(q)remote_host} ${(q)remote_session} ${(q)title_prefix} ${(q)window_name}")
     fi
   done
 
   # Install once and queue all sessions over a separate, non-interactive SSH call.
-  tmux_prepare_remote "$remote_host" "$path_for_remote" "$status_style" "$remote_group" "${sessions[@]}" || return
+  tmux_prepare_remote "$remote_host" "$path_for_remote" "$status_style" "$remote_group" "$title_prefix" "${prepare_args[@]}" || return
   iterm_reset
   "iterm_${iterm_color}"
   echo "=== ${project_name} ==="
   if (( ${#commands} )); then
     tmux_iterm_new_tabs "$iterm_color" "$split" "${commands[@]}" || return
   fi
-  tmux_connect "$remote_host" "${sessions[1]}"
+  tmux_connect "$remote_host" "${sessions[1]}" "$title_prefix" "$WORKSPACE_TABS[1]"
 }
 
 WORKSPACE_ROOT=${${(%):-%x}:A:h}

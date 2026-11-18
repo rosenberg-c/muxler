@@ -43,6 +43,18 @@ if [ -n "${ZSH_VERSION:-}" ] || { [ -n "${BASH_VERSION:-}" ] && ! shopt -oq posi
   eval 'kill-session() { tmux_kill_session "$@"; }'
 fi
 
+# Set the iTerm title for a managed session without renaming tmux sessions or windows.
+# Options are set per session so global tmux defaults and other sessions are untouched.
+tmux_session_set_title() {
+  [ "$#" -eq 3 ] || return 0
+  local session_id=$1 title_prefix=$2 title_label=$3 title
+  [ -n "$session_id" ] && [ -n "$title_prefix" ] || return 0
+  title=$(printf '%s-%s\n' "$title_prefix" "$title_label" | tr '[:lower:]' '[:upper:]') || return 1
+  tmux set-option -t "$session_id" @workspace_title "$title" || return 1
+  tmux set-option -t "$session_id" set-titles on || return 1
+  tmux set-option -t "$session_id" set-titles-string '#{?@workspace_title,#{@workspace_title},#S}'
+}
+
 # Find a session by its exact name, including names containing colons.
 tmux_session_id() {
   local session_name=$1 session_info

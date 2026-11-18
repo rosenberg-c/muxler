@@ -6,6 +6,7 @@ socket="workspace-config-$$-$RANDOM"
 tmux() { command tmux -L "$socket" "$@"; }
 trap 'tmux kill-server 2>/dev/null || true' EXIT
 tmux -f "$root/.tmux.conf" new-session -d -s config
+. "$root/.tmux_session.shared.sh"
 
 fail() { print -u2 -- "$1"; exit 1; }
 [[ $(tmux show-options -gwv mode-keys) == vi ]] || fail 'vi copy mode'
@@ -14,6 +15,18 @@ fail() { print -u2 -- "$1"; exit 1; }
 [[ $(tmux show-options -gv extended-keys-format) == csi-u ]] || fail 'extended key format'
 [[ $(tmux show-options -gv allow-passthrough) == on ]] || fail 'OSC passthrough'
 [[ $(tmux show-options -gv terminal-features) == *'*:clipboard'* && $(tmux show-options -gv terminal-features) == *'*:extkeys'* ]] || fail 'terminal features'
+[[ $(tmux show-options -gv set-titles) == on ]] || fail 'automatic terminal titles'
+title_format='#{?@workspace_title,#{@workspace_title},#S}'
+[[ $(tmux show-options -gv set-titles-string) == $title_format ]] || fail 'managed title format'
+
+tmux_session_set_title config remote-nvim nvim
+[[ $(tmux show-option -qv -t config @workspace_title) == REMOTE-NVIM-NVIM ]] || fail 'session title option'
+[[ $(tmux display-message -p -t config "$title_format") == REMOTE-NVIM-NVIM ]] || fail 'title format uses managed title'
+tmux new-session -d -s other -n lazygit
+tmux_session_set_title other local-spicy lazygit
+[[ $(tmux display-message -p -t other "$title_format") == LOCAL-SPICY-LAZYGIT ]] || fail 'title follows active session'
+tmux new-session -d -s unmanaged
+[[ $(tmux display-message -p -t unmanaged "$title_format") == unmanaged ]] || fail 'unmanaged session title fallback'
 
 root_keys=$(tmux list-keys -T root)
 copy_keys=$(tmux list-keys -T copy-mode-vi)

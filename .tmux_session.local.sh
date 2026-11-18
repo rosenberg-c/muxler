@@ -9,6 +9,7 @@ tmux_local_directory() {
   local shortcut=$1 color=$2 directory=${3:-.}
   local tabcount=${4:-${#WORKSPACE_TABS}}
   local split=${5:-}
+  local title_prefix=${funcstack[2]:-$shortcut}
   if [[ ! -d "$directory" ]]; then
     print -u2 -- "usage: $shortcut [directory]"
     return 1
@@ -16,5 +17,5 @@ tmux_local_directory() {
   local target_dir=${directory:A}
   tmux_local_tabs "$target_dir" \
     "$(tmux_local_project_name "$shortcut" "$target_dir")" "$color" \
-    "$(tmux_status_bg_color "$color")" white "$shortcut" "$tabcount" "$split"
+    "$(tmux_status_bg_color "$color")" white "$shortcut" "$tabcount" "$split" "$title_prefix"
 }

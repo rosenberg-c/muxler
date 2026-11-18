@@ -49,6 +49,11 @@ local-red >/dev/null
 [[ $local_args[1] == "$PWD" && $local_args[2] == "$(tmux_local_project_name local-red "$PWD")" && $local_args[5] == local-red ]] || fail 'local-red directory'
 [[ $local_args[2] == workspace_local-red_* ]] || fail 'local session namespace'
 
+# Titles use the launcher alias, even when the group argument differs.
+title_launcher() { tmux_local_directory local-gray muted_gray . 2; }
+title_launcher >/dev/null
+[[ ${#tab_commands} == 1 && $tab_commands[1] == *' title_launcher' ]] || fail 'local title uses launcher alias'
+
 tmux_local_directory local-blue muted_blue . 3 >/dev/null
 [[ ${#tab_commands} == 2 && $tab_commands[2] == *'opencode'* && $local_args[3] == nvim ]] || fail 'local alias three-tab limit'
 tmux_local_directory local-blue muted_blue . 4 >/dev/null
@@ -115,20 +120,24 @@ tmux_connect() { connect_args=("$@"); }
 
 remote-magenta >/dev/null
 [[ $remote_args[1] == debian-dev && $remote_args[2] == '$HOME' ]] || fail 'remote-magenta default root path'
-[[ $remote_args[5] == 'magenta_%2E_nvim' && $connect_args[2] == 'magenta_%2E_nvim' ]] || fail 'remote-magenta default root connection'
+[[ $remote_args[6] == 'magenta_%2E_nvim' && $connect_args[2] == 'magenta_%2E_nvim' ]] || fail 'remote-magenta default root connection'
 remote-magenta . >/dev/null
 [[ $remote_args[1] == debian-dev && $remote_args[2] == '$HOME' ]] || fail 'remote-magenta root path'
 [[ $remote_args[3] == "bg=$(tmux_status_bg_color muted_magenta),fg=white" && $tab_color == muted_magenta ]] || fail 'remote-magenta colors'
-[[ $remote_args[4] == remote-magenta && $remote_args[5] == 'magenta_%2E_nvim' && $connect_args[2] == 'magenta_%2E_nvim' ]] || fail 'remote-magenta root connection'
+[[ $remote_args[4] == remote-magenta && $remote_args[6] == 'magenta_%2E_nvim' && $connect_args[2] == 'magenta_%2E_nvim' ]] || fail 'remote-magenta root connection'
+
+title_remote_launcher() { tmux_remote_directory . debian-dev '$HOME' muted_gray remote-nvim nvim_ 2; }
+title_remote_launcher >/dev/null
+[[ $remote_args[5] == title_remote_launcher && $remote_args[7] == nvim ]] || fail 'remote title uses launcher alias and tab label'
 
 tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_ 3 >/dev/null
-[[ ${#remote_args} == 7 && $remote_args[7] == 'magenta_%2E_opencode' && ${#tab_commands} == 2 ]] || fail 'remote alias three-tab limit'
+[[ ${#remote_args} == 11 && $remote_args[10] == 'magenta_%2E_opencode' && ${#tab_commands} == 2 ]] || fail 'remote alias three-tab limit'
 tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_ 4 >/dev/null
-[[ ${#remote_args} == 8 && $remote_args[8] == 'magenta_%2E_tab4' && ${#tab_commands} == 3 ]] || fail 'remote alias first four tabs'
+[[ ${#remote_args} == 13 && $remote_args[12] == 'magenta_%2E_tab4' && ${#tab_commands} == 3 ]] || fail 'remote alias first four tabs'
 tmux_remote_directory . debian-dev '$HOME' muted_magenta remote-magenta magenta_ 6 3,4 >/dev/null
-[[ $tab_split == 3,4 && ${#remote_args} == 10 && ${#tab_commands} == 5 && $tab_commands[2] == *'opencode'* && $tab_commands[3] == *'tab4'* ]] || fail 'remote root split positions'
+[[ $tab_split == 3,4 && ${#remote_args} == 17 && ${#tab_commands} == 5 && $tab_commands[2] == *'opencode'* && $tab_commands[3] == *'tab4'* ]] || fail 'remote root split positions'
 tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 6 3,4 >/dev/null
-[[ $tab_split == 3,4 && $remote_args[5] == magenta_sample_nvim && ${#tab_commands} == 5 ]] || fail 'remote directory split positions'
+[[ $tab_split == 3,4 && $remote_args[6] == magenta_sample_nvim && ${#tab_commands} == 5 ]] || fail 'remote directory split positions'
 remote_args=(sentinel)
 for invalid in 1,2 3,3 3,5 5,6 3,7 abc '3,4,5'; do
   if tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 5 "$invalid" >/dev/null 2>&1; then fail "invalid remote split accepted: $invalid"; fi
@@ -136,38 +145,38 @@ done
 [[ $remote_args[1] == sentinel ]] || fail 'invalid remote split prepared sessions'
 tab_commands=(sentinel)
 tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ 1 >/dev/null
-[[ ${#remote_args} == 5 && $tab_commands[1] == sentinel && $connect_args[2] == magenta_sample_nvim ]] || fail 'remote alias one-tab limit'
+[[ ${#remote_args} == 7 && $tab_commands[1] == sentinel && $connect_args[2] == magenta_sample_nvim ]] || fail 'remote alias one-tab limit'
 for invalid in 0 10 abc; do
   if tmux_remote_directory sample debian-dev '$HOME' muted_magenta remote-magenta magenta_ "$invalid" >/dev/null 2>&1; then fail "invalid remote tab limit accepted: $invalid"; fi
 done
 
 remote-magenta sample >/dev/null
-[[ $remote_args[2] == '$HOME/sample' && $remote_args[5] == magenta_sample_nvim ]] || fail 'remote-magenta project path'
+[[ $remote_args[2] == '$HOME/sample' && $remote_args[6] == magenta_sample_nvim ]] || fail 'remote-magenta project path'
 
 remote-green sample >/dev/null
 [[ $remote_args[1] == debian-dev && $remote_args[2] == '$HOME/sample' ]] || fail 'remote-green project path'
 [[ $remote_args[3] == "bg=$(tmux_status_bg_color muted_green),fg=white" && $tab_color == muted_green ]] || fail 'remote-green colors'
-[[ $remote_args[4] == remote-green && $remote_args[5] == green_sample_nvim && $connect_args[2] == green_sample_nvim ]] || fail 'remote-green shared magenta session'
+[[ $remote_args[4] == remote-green && $remote_args[6] == green_sample_nvim && $connect_args[2] == green_sample_nvim ]] || fail 'remote-green shared magenta session'
 
 remote-green . >/dev/null
-[[ $remote_args[5] == 'green_%2E_nvim' ]] || fail 'remote-green root session'
+[[ $remote_args[6] == 'green_%2E_nvim' ]] || fail 'remote-green root session'
 remote-magenta main >/dev/null
-[[ $remote_args[5] == magenta_main_nvim ]] || fail 'remote-magenta root collides with main directory'
+[[ $remote_args[6] == magenta_main_nvim ]] || fail 'remote-magenta root collides with main directory'
 
 remote-magenta path/to/other >/dev/null
-[[ $remote_args[2] == '$HOME/path/to/other' && $remote_args[5] == 'magenta_path%2Fto%2Fother_nvim' ]] || fail 'remote-magenta nested path'
+[[ $remote_args[2] == '$HOME/path/to/other' && $remote_args[6] == 'magenta_path%2Fto%2Fother_nvim' ]] || fail 'remote-magenta nested path'
 [[ $connect_args[2] == 'magenta_path%2Fto%2Fother_nvim' ]] || fail 'remote-magenta nested connection'
 
 remote-magenta another/other >/dev/null
-[[ $remote_args[5] == 'magenta_another%2Fother_nvim' ]] || fail 'nested paths with matching leaf names collide'
+[[ $remote_args[6] == 'magenta_another%2Fother_nvim' ]] || fail 'nested paths with matching leaf names collide'
 remote-magenta 'path%2Fto%2Fother' >/dev/null
-[[ $remote_args[5] == 'magenta_path%252Fto%252Fother_nvim' ]] || fail 'escaped nested name collides with literal name'
+[[ $remote_args[6] == 'magenta_path%252Fto%252Fother_nvim' ]] || fail 'escaped nested name collides with literal name'
 
 for shortcut in remote-orange remote-cyan remote-green; do
   "$shortcut" >/dev/null
-  [[ $remote_args[2] == '$HOME' && $remote_args[5] == "${shortcut#remote-}_%2E_nvim" ]] || fail "$shortcut default root"
+  [[ $remote_args[2] == '$HOME' && $remote_args[6] == "${shortcut#remote-}_%2E_nvim" ]] || fail "$shortcut default root"
   "$shortcut" sample >/dev/null
-  [[ $remote_args[5] == "${shortcut#remote-}_sample_nvim" ]] || fail "$shortcut session name"
+  [[ $remote_args[6] == "${shortcut#remote-}_sample_nvim" ]] || fail "$shortcut session name"
 done
 
 cat > "$host_config" <<EOF
@@ -198,7 +207,7 @@ WORKSPACE_TABS=(nvim notes)
 tmux_local_directory local-blue muted_blue . 2 >/dev/null
 [[ ${#tab_commands} == 1 && $tab_commands[1] == *'notes'* && $local_args[3] == nvim ]] || fail 'custom local windows'
 tmux_remote_directory sample debian-dev '$HOME' muted_cyan remote-cyan cyan_ 2 >/dev/null
-[[ ${#tab_commands} == 1 && ${#remote_args} == 6 && $remote_args[5] == cyan_sample_nvim && $remote_args[6] == cyan_sample_notes ]] || fail 'custom remote windows'
+[[ ${#tab_commands} == 1 && ${#remote_args} == 9 && $remote_args[6] == cyan_sample_nvim && $remote_args[8] == cyan_sample_notes ]] || fail 'custom remote windows'
 [[ $connect_args[2] == cyan_sample_nvim ]] || fail 'custom remote main window'
 if local-blue >/dev/null 2>&1; then fail 'local alias tabcount exceeds shortened tab list'; fi
 if remote-cyan sample >/dev/null 2>&1; then fail 'remote alias tabcount exceeds shortened tab list'; fi
@@ -207,9 +216,13 @@ WORKSPACE_TABS=("${original_tabs[@]}")
 # Verify the remote hook is streamed to SSH, without contacting a host.
 source "${0:A:h:h}/.zsh_tmux"
 ssh() { ssh_args=("$@"); ssh_script=$(cat); }
-tmux_prepare_remote "$WORKSPACE_TEST_HOST" '$HOME/work/sample' 'bg=#5f3030,fg=white' remote-magenta sample_nvim
+tmux_prepare_remote "$WORKSPACE_TEST_HOST" '$HOME/work/sample' 'bg=#5f3030,fg=white' remote-magenta remote-magenta sample_nvim nvim
 [[ $ssh_args[1] == $WORKSPACE_TEST_HOST && $ssh_script == *'tmux_session_install'* ]] || fail 'remote hook transfer'
 [[ $ssh_script == *'tmux_session_prepare "$target_dir" "$session_name"'* && $ssh_script == *'@workspace_remote_group'* ]] || fail 'remote session preparation'
 [[ $ssh_args[2] == *'remote-magenta'* && $ssh_args[2] == *'sample_nvim'* ]] || fail 'remote group transfer'
+[[ $ssh_script == *'tmux_session_set_title "$session_id" "$title_prefix" "$title_label"'* ]] || fail 'remote title setup'
+if [[ $ssh_script == *'set-option -g set-titles'* ]]; then fail 'remote setup must not change global tmux title options'; fi
+[[ $ssh_script == *'tmux set-option -t "$session_id" set-titles on'* ]] || fail 'per-session tmux title options'
+print -r -- "$ssh_script" | sh -n || fail 'remote setup script syntax'
 
 print 'session command tests passed'

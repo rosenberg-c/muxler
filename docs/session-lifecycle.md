@@ -8,7 +8,8 @@
    extra iTerm2 tabs; the first session attaches in the current terminal.
 3. `tmux_local` uses `tmux_session_prepare` from `.tmux_session.shared.sh` to
    find or create each session. It marks managed sessions with
-   `@workspace_local_group` and `@workspace_local_name` for the kill menu.
+   `@workspace_local_group` and `@workspace_local_name` for the kill menu, and
+   sets `@workspace_title` from the launcher alias and tab name.
 
 ## Remote shortcut
 
@@ -18,7 +19,9 @@
    `.tmux_session.shared.sh` over SSH, installs it as
    `~/.tmux_session.shared.sh`, and sources it. It adds source lines to the
    remote Bash/Zsh startup files and prepares all tab sessions in one SSH call.
-   Each is marked with `@workspace_remote_group` and `@workspace_remote_name`.
+   Each is marked with `@workspace_remote_group` and `@workspace_remote_name`,
+   gets an `@workspace_title`, and receives the tmux title options on the remote
+   server; no remote config file is needed for titles.
 3. `tmux_connect` attaches each tab over SSH, creating a missing session if
    needed. Extra tabs use new iTerm2 tabs; the first uses the current terminal.
 
