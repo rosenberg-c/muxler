@@ -71,9 +71,15 @@ osascript() { cat > "$script_file"; }
 real_tmux_iterm_new_tabs muted_blue 3,4 'echo two' 'echo three' 'echo four' 'echo five'
 [[ $(grep -c 'create tab with default profile' "$script_file") == 3 && $(grep -c 'split vertically with default profile' "$script_file") == 1 ]] || fail 'split layout creates three tabs and one side-by-side pane'
 [[ $(grep -c 'write text' "$script_file") == 4 ]] || fail 'split layout writes every command'
+[[ $(grep -c 'set columns to (((columns of newSession) \* 25) div 50)' "$script_file") == 1 ]] || fail 'split layout defaults to a quarter-width right pane'
 [[ $(<"$script_file") == *'echo three'*'split vertically with default profile'*'echo four'* ]] || fail 'split layout puts positions 3 and 4 together'
+WORKSPACE_SPLIT_RIGHT_PERCENT=40 real_tmux_iterm_new_tabs muted_blue 3,4 'echo two' 'echo three' 'echo four'
+[[ $(grep -c 'set columns to (((columns of newSession) \* 40) div 50)' "$script_file") == 1 ]] || fail 'split layout respects configured right pane width'
+for invalid in 0 100 abc '25; error'; do
+  if WORKSPACE_SPLIT_RIGHT_PERCENT=$invalid real_tmux_iterm_new_tabs muted_blue 3,4 'echo two' 'echo three' 'echo four' >/dev/null 2>&1; then fail "invalid right pane width accepted: $invalid"; fi
+done
 real_tmux_iterm_new_tabs muted_blue '' 'echo two' 'echo three'
-[[ $(grep -c 'create tab with default profile' "$script_file") == 2 && $(grep -c 'split vertically' "$script_file") == 0 ]] || fail 'default layout creates separate tabs'
+[[ $(grep -c 'create tab with default profile' "$script_file") == 2 && $(grep -c 'split vertically' "$script_file") == 0 && $(grep -c 'set columns to' "$script_file") == 0 ]] || fail 'default layout creates separate tabs'
 
 for shortcut in local-blue local-muxler local-purple; do
   local_color=${shortcut#local-}

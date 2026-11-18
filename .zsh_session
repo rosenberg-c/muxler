@@ -181,6 +181,11 @@ tmux_local() {
 tmux_iterm_new_tabs() {
   local iterm_color=$1 split=$2 command_text position=2
   local split_second=${split#*,}
+  local split_right_percent=${WORKSPACE_SPLIT_RIGHT_PERCENT:-20}
+  if [[ -n $split ]] && { [[ $split_right_percent != <-> ]] || (( split_right_percent < 1 || split_right_percent > 99 )); }; then
+    print -u2 -- 'WORKSPACE_SPLIT_RIGHT_PERCENT must be between 1 and 99'
+    return 1
+  fi
   shift 2
   {
     print -r -- 'tell application "iTerm2"'
@@ -196,6 +201,7 @@ tmux_iterm_new_tabs() {
         print -r -- '      set newSession to (split vertically with default profile)'
         print -r -- '    end tell'
         print -r -- '    tell newSession'
+        print -r -- "      set columns to (((columns of newSession) * $split_right_percent) div 50)"
       else
         print -r -- '    set newTab to (create tab with default profile)'
         print -r -- '    tell current session of newTab'

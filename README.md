@@ -24,7 +24,7 @@ For personal shortcuts, create `user.sessions.local.sh` or `user.sessions.remote
 local-blue() { local tabcount=4; tmux_local_directory local-blue muted_blue "${1:-.}" "$tabcount"; }
 ```
 
-To put positions 3 and 4 side by side in one iTerm tab, pass an optional split pair after the tab count. The first position still uses the invoking terminal; split pairs must be adjacent positions between 2 and `tabcount`.
+To put positions 3 and 4 side by side in one iTerm tab, pass an optional split pair after the tab count. The right pane defaults to roughly 25% of the tab width; set `WORKSPACE_SPLIT_RIGHT_PERCENT` to a number from 1 to 99 to change it (for example, `WORKSPACE_SPLIT_RIGHT_PERCENT=40`). The first position still uses the invoking terminal; split pairs must be adjacent positions between 2 and `tabcount`.
 
 ```zsh
 local-octop() {
