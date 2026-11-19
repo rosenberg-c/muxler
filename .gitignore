@@ -1,3 +1,4 @@
 ssh/config
 user.sessions.local.sh
 user.sessions.remote.sh
+config.json

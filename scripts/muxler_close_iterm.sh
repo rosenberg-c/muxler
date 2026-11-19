@@ -12,8 +12,73 @@ MUXLER_REMOTE_MANIFEST=${MUXLER_REMOTE_MANIFEST:-.muxler_closeout}
 MUXLER_CLOSEOUT_AGE_LIMIT=${MUXLER_CLOSEOUT_AGE_LIMIT:-30}
 
 closeout_log() {
-  printf '%s muxler closeout: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$MUXLER_CLOSEOUT_LOG" 2>/dev/null || :
+  printf '%s muxler closeout: %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf 'unknown')" "$1" >> "$MUXLER_CLOSEOUT_LOG" 2>/dev/null || :
 }
+
+# Config is read locally by this helper. A false toggle makes closeout a no-op;
+# invalid or missing config defaults to false. This never affects tmux kills,
+# which have already happened or happen independently.
+if [ -n "${MUXLER_CONFIG:-}" ]; then
+  MUXLER_CONFIG_FILE=$MUXLER_CONFIG
+elif [ -n "${WORKSPACE_ROOT:-}" ]; then
+  MUXLER_CONFIG_FILE=$WORKSPACE_ROOT/config.json
+else
+  helper_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || helper_dir=$(dirname -- "$0")
+  MUXLER_CONFIG_FILE="$helper_dir/../config.json"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  close_tabs_enabled=$(python3 - "$MUXLER_CONFIG_FILE" <<'PY'
+import json
+import sys
+
+path = sys.argv[1] if len(sys.argv) > 1 else ""
+if not path:
+    print("false")
+    raise SystemExit(0)
+
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+except FileNotFoundError:
+    print("false")
+    raise SystemExit(0)
+except Exception as exc:
+    print(
+        "muxler: warning: could not read or parse %s (%s); "
+        "defaulting close_tabs_on_kill_session to false" % (path, exc),
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+if not isinstance(data, dict):
+    print(
+        "muxler: warning: %s must contain a JSON object; "
+        "defaulting close_tabs_on_kill_session to false" % path,
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+value = data.get("close_tabs_on_kill_session", False)
+if type(value) is not bool:
+    print(
+        "muxler: warning: close_tabs_on_kill_session in %s must be boolean; "
+        "defaulting to false" % path,
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+print("true" if value else "false")
+PY
+)
+else
+  closeout_log 'python3 not found; defaulting close_tabs_on_kill_session to false'
+  close_tabs_enabled=false
+fi
+[[ $close_tabs_enabled == true ]] || exit 0
 
 # Accept only the macos pty form iTerm2 reports. This also makes the value safe
 # to embed in generated AppleScript.

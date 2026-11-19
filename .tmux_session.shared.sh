@@ -27,6 +27,90 @@ tmux_valid_closeout_manifest() {
   return 0
 }
 
+# Resolve the local config file. Config is read only on the machine running
+# kill-session/closeout; remote hosts are not required to have or parse it.
+muxler_config_path() {
+  if [ -n "${MUXLER_CONFIG:-}" ]; then
+    printf '%s\n' "$MUXLER_CONFIG"
+    return 0
+  fi
+  if [ -n "${WORKSPACE_ROOT:-}" ]; then
+    printf '%s\n' "$WORKSPACE_ROOT/config.json"
+    return 0
+  fi
+  if [ -n "${MUXLER_CLOSEOUT_SCRIPT:-}" ]; then
+    script_dir=$(CDPATH= cd -- "$(dirname -- "$MUXLER_CLOSEOUT_SCRIPT")" && pwd -P) || return 1
+    root_dir=$(CDPATH= cd -- "$script_dir/.." && pwd -P) || return 1
+    [ -n "$root_dir" ] || return 1
+    printf '%s\n' "$root_dir/config.json"
+    return 0
+  fi
+  return 1
+}
+
+# Read the boolean toggle with Python's standard JSON parser. Missing config
+# and a missing key default to false. Invalid JSON or a non-boolean value warns
+# on stderr and still resolves to false so killing is never blocked.
+muxler_config_close_tabs_value() {
+  local config_path=${1:-}
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf '%s\n' 'muxler: warning: python3 is required to read config.json; defaulting close_tabs_on_kill_session to false' >&2
+    printf '%s\n' false
+    return 0
+  fi
+  python3 - "$config_path" <<'PY'
+import json
+import sys
+
+path = sys.argv[1] if len(sys.argv) > 1 else ""
+if not path:
+    print("false")
+    raise SystemExit(0)
+
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+except FileNotFoundError:
+    print("false")
+    raise SystemExit(0)
+except Exception as exc:
+    print(
+        "muxler: warning: could not read or parse %s (%s); "
+        "defaulting close_tabs_on_kill_session to false" % (path, exc),
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+if not isinstance(data, dict):
+    print(
+        "muxler: warning: %s must contain a JSON object; "
+        "defaulting close_tabs_on_kill_session to false" % path,
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+value = data.get("close_tabs_on_kill_session", False)
+if type(value) is not bool:
+    print(
+        "muxler: warning: close_tabs_on_kill_session in %s must be boolean; "
+        "defaulting to false" % path,
+        file=sys.stderr,
+    )
+    print("false")
+    raise SystemExit(0)
+
+print("true" if value else "false")
+PY
+}
+
+muxler_close_tabs_enabled() {
+  config_path=$(muxler_config_path 2>/dev/null) || config_path=""
+  [ -n "$config_path" ] || return 1
+  [ "$(muxler_config_close_tabs_value "$config_path")" = true ]
+}
+
 # Record exactly which panes this kill-session invocation intends to close.
 # The manifest is written before any kill and only includes sessions with a
 # tty recorded at launch. All failures are swallowed: a missing manifest means
@@ -35,6 +119,16 @@ tmux_valid_closeout_manifest() {
 tmux_kill_session_prepare_closeout() {
   local kind=$1 group=$2 dir=$3 id tty name tmp ids_tmp rows_tmp token manifest target count=0
   [ "$kind" = local ] || [ "$kind" = remote ] || return 0
+  # Only local shells know the repo config. Remote installs do not have
+  # MUXLER_CLOSEOUT_SCRIPT/WORKSPACE_ROOT and always write kill-intent manifests;
+  # the local closeout helper is the final false/true gate there.
+  if [ -n "${MUXLER_CLOSEOUT_SCRIPT:-}" ] || [ -n "${WORKSPACE_ROOT:-}" ]; then
+    # The toggle is advisory: a false value skips manifest/closeout only. It never
+    # prevents or delays the tmux kills below.
+    if ! muxler_close_tabs_enabled; then
+      return 0
+    fi
+  fi
   ids_tmp=$(mktemp "${TMPDIR:-/tmp}/muxler-ids.XXXXXX" 2>/dev/null) || return 0
   cat > "$ids_tmp" 2>/dev/null || { rm -f -- "$ids_tmp"; return 0; }
 

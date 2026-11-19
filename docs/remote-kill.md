@@ -78,3 +78,11 @@ Manifest creation and iTerm automation are strictly best effort: the tmux kill
 always proceeds. Any failure or uncertainty (missing tty, session still alive,
 stale manifest, invalid tty, AppleScript error) leaves tabs open and appends a
 message to `~/.muxler_closeout.log`.
+
+Pane closeout is controlled by repo-root `config.json`
+(`close_tabs_on_kill_session: true` to enable). Missing config, a missing key,
+invalid JSON, a non-boolean value, or unavailable Python/parser handling
+defaults to `false`; the tmux kill still runs and closeout becomes a no-op when
+disabled.
+Config is read locally by the closeout helper and by local `kill-session`
+preparation, so remote hosts do not need JSON tooling.
