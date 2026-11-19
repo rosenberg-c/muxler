@@ -174,6 +174,16 @@ tmux_local() {
     tmux set-option -t "$session_id" @workspace_local_name "$session_name" || return
   fi
 
+  # Record the outer iTerm tty before attaching so kill-session can identify
+  # this exact pane later. Inside tmux, tty is the tmux pty, not iTerm's.
+  if [[ -z ${TMUX:-} ]]; then
+    local iterm_tty
+    iterm_tty=$(tty 2>/dev/null) || iterm_tty=''
+    if [[ $iterm_tty =~ '^/dev/ttys[0-9]+$' ]]; then
+      tmux set-option -t "$session_id" @workspace_iterm_tty "$iterm_tty" || return
+    fi
+  fi
+
   if [[ -n "$TMUX" ]]; then
     tmux switch-client -t "$session_id"
   else
@@ -310,6 +320,8 @@ tmux_remote_tabs() {
 }
 
 WORKSPACE_ROOT=${${(%):-%x}:A:h}
+# Closeout helper for kill-session; remote shells never receive this path.
+MUXLER_CLOSEOUT_SCRIPT="$WORKSPACE_ROOT/scripts/muxler_close_iterm.sh"
 . "$WORKSPACE_ROOT/.tmux_session.local.sh"
 . "$WORKSPACE_ROOT/sessions.local.sh"
 . "$WORKSPACE_ROOT/.tmux_session.remote.sh"

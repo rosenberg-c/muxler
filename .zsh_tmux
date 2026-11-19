@@ -52,6 +52,16 @@ tmux_connect() {
   fi
   local host=$1 session=$2 title_prefix=${3:-} title_label=${4:-}
   local q_session=${(qq)session} q_prefix=${(qq)title_prefix} q_label=${(qq)title_label}
+  local iterm_tty='' closeout_token=''
+  local closeout_manifest=${MUXLER_REMOTE_MANIFEST:-.muxler_closeout}
+  case $closeout_manifest in
+    ''|.|..|[!A-Za-z0-9.]*|*[!A-Za-z0-9._-]*) closeout_manifest=.muxler_closeout ;;
+  esac
+  if [[ -z ${TMUX:-} ]]; then
+    iterm_tty=$(tty 2>/dev/null) || iterm_tty=''
+    [[ $iterm_tty =~ '^/dev/ttys[0-9]+$' ]] || iterm_tty=''
+    closeout_token="$(date +%s)-$$-$RANDOM-$RANDOM"
+  fi
   local remote_command='if [ -r "$HOME/.tmux_session.shared.sh" ]; then
   . "$HOME/.tmux_session.shared.sh"
   session_id=$(tmux_session_id '
@@ -69,9 +79,25 @@ tmux_connect() {
   remote_command+=' || exit
     fi
   fi
-  exec tmux attach-session -t "$session_id"
+'
+  if [[ -n $closeout_token ]]; then
+    remote_command+="  tmux set-option -t \"\$session_id\" @workspace_iterm_tty ${(qq)iterm_tty} || exit
+  tmux set-option -t \"\$session_id\" @workspace_iterm_token ${(qq)closeout_token} || exit
+  tmux set-option -t \"\$session_id\" @workspace_closeout_manifest ${(qq)closeout_manifest} || exit
+"
+  fi
+  remote_command+='  exec tmux attach-session -t "$session_id"
 fi
 exec tmux new-session -A -s '
   remote_command+=$q_session
-  ssh -t "$host" "$remote_command"
+  local ssh_status=0
+  ssh -t "$host" "$remote_command" || ssh_status=$?
+  # Only this attachment's token can match its remote manifest. A detach or
+  # SSH drop has no consumed manifest and this is a no-op.
+  if [[ -n ${MUXLER_CLOSEOUT_SCRIPT:-} && -r ${MUXLER_CLOSEOUT_SCRIPT} ]]; then
+    zsh "$MUXLER_CLOSEOUT_SCRIPT" remote "$host" "$session" \
+      "$closeout_token" "$closeout_manifest" ||
+      print -u2 -- 'muxler: iTerm cleanup failed; tabs left open'
+  fi
+  return $ssh_status
 }

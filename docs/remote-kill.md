@@ -46,3 +46,35 @@ requirement. The shared file *is* installed for future pane shells; see
 An SSH listing failure aborts the menu rather than showing a partial list.
 The menu refreshes across all hosts after each kill. An invalid index shows an
 error and prompts again; blank exits.
+
+## iTerm pane closeout
+
+`kill-session` (not the `kill-local`/`kill-remote` menus) also asks iTerm2 to
+close the panes belonging to the sessions it just killed. When a shortcut
+launches a tab, the pane's outer iTerm tty is stored as `@workspace_iterm_tty`
+on its tmux session. Before killing anything, `kill-session` writes a manifest
+of the matching sessions and their recorded ttys. The separate closeout helper
+(`scripts/muxler_close_iterm.sh`) only closes sessions whose tmux session is
+verified gone and whose tty is in that manifest; it never matches by title.
+
+For local sessions the helper is started detached before the kill, because the
+pane running `kill-session` dies with its own session. For remote sessions,
+`tmux_connect` generates a token for the attachment and stores it with the
+manifest basename as `@workspace_iterm_token` and
+`@workspace_closeout_manifest`. Each remote manifest is written as
+`$HOME/<manifest>.<token>`, so overlapping kills cannot overwrite one another.
+When each attached SSH session ends, the local wrapper passes that token back;
+the helper re-checks the recent manifest, its token header, and session outcome
+over SSH, then consumes the manifest once before closing any panes. An ordinary
+detach or SSH disconnect has no manifest for its token and is a no-op.
+
+The singleton fallback also participates: when `kill-session` kills only the
+current session because group/name markers are absent, it prepares closeout if
+that session has a recorded muxler tty and, remotely, a valid attachment token.
+It matches the exact session name without requiring a group marker. Sessions
+without that recorded metadata are still killed only, with no pane closeout.
+
+Manifest creation and iTerm automation are strictly best effort: the tmux kill
+always proceeds. Any failure or uncertainty (missing tty, session still alive,
+stale manifest, invalid tty, AppleScript error) leaves tabs open and appends a
+message to `~/.muxler_closeout.log`.

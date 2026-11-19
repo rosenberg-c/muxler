@@ -15,6 +15,7 @@ existing sessions.
 | `.zsh_tmux` | Remote setup and SSH attachment. |
 | `.tmux_session.shared.sh` | Session creation/reuse and pane prompt setup. |
 | `scripts/tmux_remote_groups.sh` | Remote kill-menu listing and validation. |
+| `scripts/muxler_close_iterm.sh` | Verified, best-effort iTerm2 pane closeout after `kill-session`. |
 | `ssh/config` | SSH host aliases for remote shortcuts and the kill menu. |
 
 Source `.zsh_session` and `.zsh_tmux` locally ([setup](../README.md#setup)).

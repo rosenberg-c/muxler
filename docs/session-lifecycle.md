@@ -9,7 +9,9 @@
 3. `tmux_local` uses `tmux_session_prepare` from `.tmux_session.shared.sh` to
    find or create each session. It marks managed sessions with
    `@workspace_local_group` and `@workspace_local_name` for the kill menu, and
-   sets `@workspace_title` from the launcher alias and tab name.
+   sets `@workspace_title` from the launcher alias and tab name. Before
+   attaching, it records the pane's outer iTerm tty as
+   `@workspace_iterm_tty` so `kill-session` can close only that pane later.
 
 ## Remote shortcut
 
@@ -23,7 +25,11 @@
    gets an `@workspace_title`, and receives the tmux title options on the remote
    server; no remote config file is needed for titles.
 3. `tmux_connect` attaches each tab over SSH, creating a missing session if
-   needed. Extra tabs use new iTerm2 tabs; the first uses the current terminal.
+   needed. It passes the local iTerm tty, a fresh attachment token, and the
+   configured manifest basename to the remote session options. Extra tabs use
+   new iTerm2 tabs; the first uses the current terminal. After SSH ends, it only
+   runs the closeout helper if a matching, unconsumed remote manifest verifies
+   that token's kill-session outcome.
 
 ### Why install the shared file remotely?
 

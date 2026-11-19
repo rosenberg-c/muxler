@@ -9,12 +9,113 @@ tmux_kill_session_matches() {
   [ -n "$marked_name" ] && [ "$name" = "$marked_name" ]
 }
 
+tmux_valid_closeout_tty() {
+  case $1 in
+    /dev/ttys*) case ${1#/dev/ttys} in ''|*[!0-9]*) return 1 ;; esac ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
+tmux_valid_closeout_token() {
+  case $1 in ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  return 0
+}
+
+tmux_valid_closeout_manifest() {
+  case $1 in ''|.|..|[!A-Za-z0-9.]*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  return 0
+}
+
+# Record exactly which panes this kill-session invocation intends to close.
+# The manifest is written before any kill and only includes sessions with a
+# tty recorded at launch. All failures are swallowed: a missing manifest means
+# "no cleanup", never "skip the kill". Remote manifests are named per attached
+# pane token, so overlapping kills cannot overwrite each other.
+tmux_kill_session_prepare_closeout() {
+  local kind=$1 group=$2 dir=$3 id tty name tmp ids_tmp rows_tmp token manifest target count=0
+  [ "$kind" = local ] || [ "$kind" = remote ] || return 0
+  ids_tmp=$(mktemp "${TMPDIR:-/tmp}/muxler-ids.XXXXXX" 2>/dev/null) || return 0
+  cat > "$ids_tmp" 2>/dev/null || { rm -f -- "$ids_tmp"; return 0; }
+
+  if [ "$kind" = local ]; then
+    tmp=$(mktemp "${TMPDIR:-/tmp}/muxler-closeout.XXXXXX" 2>/dev/null) || {
+      rm -f -- "$ids_tmp"
+      return 0
+    }
+    if ! printf '%s\t%s\t%s\n' "$(date +%s)" "$group" "$dir" > "$tmp" 2>/dev/null; then
+      rm -f -- "$tmp" "$ids_tmp"
+      return 0
+    fi
+    while IFS= read -r id; do
+      [ -n "$id" ] || continue
+      tty=$(tmux show-option -qv -t "$id" @workspace_iterm_tty 2>/dev/null) || tty=''
+      tmux_valid_closeout_tty "$tty" || continue
+      name=$(tmux display-message -p -t "$id" '#{session_name}' 2>/dev/null) || continue
+      [ -n "$name" ] || continue
+      if ! printf '%s\t%s\t%s\n' "$id" "$tty" "$name" >> "$tmp" 2>/dev/null; then
+        rm -f -- "$tmp" "$ids_tmp"
+        return 0
+      fi
+      count=$((count + 1))
+    done < "$ids_tmp"
+    rm -f -- "$ids_tmp"
+    if [ "$count" -gt 0 ]; then
+      # Detached: the pane running this function dies with the current session.
+      ( nohup zsh "$MUXLER_CLOSEOUT_SCRIPT" local "$tmp" </dev/null >/dev/null 2>&1 & ) 2>/dev/null || :
+    else
+      rm -f -- "$tmp"
+    fi
+    return 0
+  fi
+
+  rows_tmp=$(mktemp "${TMPDIR:-/tmp}/muxler-rows.XXXXXX" 2>/dev/null) || {
+    rm -f -- "$ids_tmp"
+    return 0
+  }
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    tty=$(tmux show-option -qv -t "$id" @workspace_iterm_tty 2>/dev/null) || tty=''
+    tmux_valid_closeout_tty "$tty" || continue
+    name=$(tmux display-message -p -t "$id" '#{session_name}' 2>/dev/null) || continue
+    [ -n "$name" ] || continue
+    if ! printf '%s\t%s\t%s\n' "$id" "$tty" "$name" >> "$rows_tmp" 2>/dev/null; then
+      rm -f -- "$rows_tmp" "$ids_tmp"
+      return 0
+    fi
+    count=$((count + 1))
+  done < "$ids_tmp"
+  if [ "$count" -eq 0 ]; then
+    rm -f -- "$rows_tmp" "$ids_tmp"
+    return 0
+  fi
+
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    token=$(tmux show-option -qv -t "$id" @workspace_iterm_token 2>/dev/null) || token=''
+    manifest=$(tmux show-option -qv -t "$id" @workspace_closeout_manifest 2>/dev/null) || manifest=''
+    [ -n "$manifest" ] || manifest=${MUXLER_REMOTE_MANIFEST:-.muxler_closeout}
+    tmux_valid_closeout_token "$token" || continue
+    tmux_valid_closeout_manifest "$manifest" || continue
+    tmp=$(mktemp "$HOME/.${manifest#.}.XXXXXX" 2>/dev/null) || continue
+    target="$HOME/$manifest.$token"
+    if printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$token" "$group" "$dir" > "$tmp" 2>/dev/null &&
+       cat -- "$rows_tmp" >> "$tmp" 2>/dev/null; then
+      mv -f -- "$tmp" "$target" 2>/dev/null || rm -f -- "$tmp"
+    else
+      rm -f -- "$tmp"
+    fi
+  done < "$ids_tmp"
+  rm -f -- "$rows_tmp" "$ids_tmp"
+  return 0
+}
+
 tmux_kill_session() {
   if [ "$#" -ne 0 ] || [ -z "${TMUX:-}" ] || [ -z "${TMUX_PANE:-}" ]; then
     printf '%s\n' 'usage: kill-session (from inside tmux)' >&2
     return 1
   fi
-  local current_id group_option name_option group dir ids id
+  local current_id group_option name_option group dir ids id selected
   current_id=$(tmux display-message -p -t "$TMUX_PANE" '#{session_id}') || return 1
   [ -n "$current_id" ] || return 1
   group_option=@workspace_local_group name_option=@workspace_local_name
@@ -25,10 +126,39 @@ tmux_kill_session() {
   fi
   dir=$(tmux show-option -qv -t "$current_id" @session_target_dir) || return 1
   if [ -z "$group" ] || [ -z "$dir" ] || ! tmux_kill_session_matches "$current_id" "$group_option" "$name_option" "$group" "$dir"; then
+    # Singleton fallback: only a recorded muxler tty makes closeout safe. A
+    # remote fallback also needs its attachment token; the writer validates
+    # both and skips unmarked sessions that never came from muxler.
+    if [ -n "${MUXLER_CLOSEOUT_SCRIPT:-}" ] && [ -r "$MUXLER_CLOSEOUT_SCRIPT" ]; then
+      tmux_kill_session_prepare_closeout local '' '' <<EOF
+$current_id
+EOF
+    else
+      tmux_kill_session_prepare_closeout remote '' '' <<EOF
+$current_id
+EOF
+    fi
     tmux kill-session -t "$current_id"
     return $?
   fi
   ids=$(tmux list-sessions -F '#{session_id}') || return 1
+  selected=$current_id
+  while IFS= read -r id; do
+    [ -n "$id" ] && [ "$id" != "$current_id" ] || continue
+    tmux_kill_session_matches "$id" "$group_option" "$name_option" "$group" "$dir" || continue
+    selected=$(printf '%s\n%s' "$selected" "$id")
+  done <<EOF
+$ids
+EOF
+  if [ -n "${MUXLER_CLOSEOUT_SCRIPT:-}" ] && [ -r "$MUXLER_CLOSEOUT_SCRIPT" ]; then
+    tmux_kill_session_prepare_closeout local "$group" "$dir" <<EOF
+$selected
+EOF
+  elif [ "$group_option" = @workspace_remote_group ]; then
+    tmux_kill_session_prepare_closeout remote "$group" "$dir" <<EOF
+$selected
+EOF
+  fi
   while IFS= read -r id; do
     [ -n "$id" ] && [ "$id" != "$current_id" ] || continue
     tmux_kill_session_matches "$id" "$group_option" "$name_option" "$group" "$dir" || continue
